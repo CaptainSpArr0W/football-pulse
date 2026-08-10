@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>球队档案 · 足球脉动</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="top-strip">
+      <div class="wrap top-strip-inner">
+        <span>已订阅人数：<b id="subCount">--</b></span>
+        <span>当前在线人数：<b id="onlineCount">--</b></span>
+      </div>
+    </div>
+    <div class="wrap header-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">
+          <strong>足球脉动</strong>
+          <em>FOOTBALL PULSE</em>
+        </span>
+      </a>
+      <a class="back-link" href="/">← 返回赛程</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- 球队横幅 -->
+    <section class="team-banner" id="teamBanner">
+      <div class="banner-bg" id="bannerBg" aria-hidden="true"></div>
+      <div class="banner-inner">
+        <div class="team-crest-big" id="teamCrest"></div>
+        <div class="team-id">
+          <h1 id="teamName">加载中…</h1>
+          <p class="team-en" id="teamEn"></p>
+          <ul class="team-facts" id="teamFacts"></ul>
+        </div>
+        <div class="team-form-wrap">
+          <span class="form-label">近六场</span>
+          <div class="form-chips" id="formChips"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 相关赛事（含实时 XG） -->
+    <section class="team-live" id="teamLiveSection" hidden>
+      <div class="section-title">
+        <h2>相关赛事</h2>
+        <span class="section-note">比赛进行中会实时更新 XG 与比分</span>
+      </div>
+      <div class="match-list" id="teamMatches"></div>
+    </section>
+
+    <!-- 近六场比赛 -->
+    <section>
+      <div class="section-title">
+        <h2>近六场比赛 · 场面数据</h2>
+        <span class="section-note">XG 为预期进球，XGA 为预期失球</span>
+      </div>
+      <div class="recent-grid" id="recentGrid"></div>
+    </section>
+
+    <!-- 首发阵容 -->
+    <section>
+      <div class="section-title">
+        <h2>首发阵容</h2>
+        <span class="section-note" id="formationNote"></span>
+      </div>
+      <div class="lineup-wrap">
+        <svg id="pitchSvg" class="pitch" viewBox="0 0 500 640" role="img" aria-label="球场阵容图">
+          <defs>
+            <linearGradient id="pitchGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#1e252e"/>
+              <stop offset="100%" stop-color="#232b35"/>
+            </linearGradient>
+          </defs>
+          <rect x="0" y="0" width="500" height="640" fill="url(#pitchGrad)"/>
+          <!-- 中线 / 中圈 -->
+          <line x1="250" y1="0" x2="250" y2="640" stroke="#39424e" stroke-width="2" stroke-dasharray="6 5"/>
+          <circle cx="250" cy="320" r="52" fill="none" stroke="#39424e" stroke-width="2"/>
+          <circle cx="250" cy="320" r="3" fill="#39424e"/>
+          <!-- 禁区 -->
+          <rect x="72" y="0" width="356" height="64" fill="none" stroke="#39424e" stroke-width="2"/>
+          <rect x="72" y="576" width="356" height="64" fill="none" stroke="#39424e" stroke-width="2"/>
+          <rect x="130" y="0" width="240" height="32" fill="none" stroke="#39424e" stroke-width="2"/>
+          <rect x="130" y="608" width="240" height="32" fill="none" stroke="#39424e" stroke-width="2"/>
+          <circle cx="250" cy="48" r="3" fill="#39424e"/>
+          <circle cx="250" cy="592" r="3" fill="#39424e"/>
+          <!-- 底线上方方向标记 -->
+          <text x="250" y="28" text-anchor="middle" class="pitch-dir">进攻方向 ↑</text>
+        </svg>
+        <div class="lineup-bench">
+          <h3>首发名单</h3>
+          <ul id="lineupList"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 舆论报道 -->
+    <section>
+      <div class="section-title">
+        <h2>舆论报道</h2>
+        <span class="section-note">来自媒体与平台的综合资讯，标注立场倾向</span>
+      </div>
+      <div class="news-list" id="newsList"></div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>足球脉动 Football Pulse · 舆论报道为演示内容，仅供参考</p>
+    </div>
+  </footer>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/team.js"></script>
+</body>
+</html>

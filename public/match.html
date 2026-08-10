@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>比赛实时数据 · 足球脉动</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="top-strip">
+      <div class="wrap top-strip-inner">
+        <span>已订阅人数：<b id="subCount">--</b></span>
+        <span>当前在线人数：<b id="onlineCount">--</b></span>
+      </div>
+    </div>
+    <div class="wrap header-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">
+          <strong>足球脉动</strong>
+          <em>FOOTBALL PULSE</em>
+        </span>
+      </a>
+      <a class="back-link" href="/">← 返回赛程</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- 比赛横幅 -->
+    <section class="match-hero" id="matchHero">
+      <div class="hero-top">
+        <span id="heroComp" class="hero-comp">加载中…</span>
+        <div class="hero-top-right">
+          <button class="sub-btn hero-sub" id="heroSub" data-text="1" hidden>☆ 订阅</button>
+          <span id="heroStatus" class="hero-status"></span>
+        </div>
+      </div>
+      <div class="hero-teams">
+        <div class="hero-team">
+          <span class="crest-big" id="homeCrest"></span>
+          <span class="hero-team-name" id="homeName"></span>
+        </div>
+        <div class="hero-score" id="heroScore">– : –</div>
+        <div class="hero-team">
+          <span class="crest-big" id="awayCrest"></span>
+          <span class="hero-team-name" id="awayName"></span>
+        </div>
+      </div>
+      <div class="hero-xg" id="heroXg"></div>
+    </section>
+
+    <!-- 实时数据（仅进行中） -->
+    <section id="liveDataSection" hidden>
+      <div class="section-title">
+        <h2><span class="live-dot" aria-hidden="true"></span>实时数据</h2>
+        <span class="section-note">数据随比赛实时推送</span>
+      </div>
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="halftime-report" id="halfReport" hidden></div>
+      <div class="match-events">
+        <div class="section-title">
+          <h2>关键事件</h2>
+        </div>
+        <div class="events-card" id="matchEvents"></div>
+      </div>
+    </section>
+
+    <!-- 赔率 -->
+    <section>
+      <div class="section-title">
+        <h2>赔率数据</h2>
+        <span class="section-note">欧赔 / 亚盘 / 大小球 / 角球</span>
+      </div>
+      <div class="match-card odds-only" id="oddsWrap"></div>
+    </section>
+
+    <!-- 双方阵容 -->
+    <section>
+      <div class="section-title">
+        <h2>双方首发</h2>
+        <span class="section-note">点击队名查看完整档案</span>
+      </div>
+      <div class="lineup-compare" id="lineupCompare"></div>
+    </section>
+
+    <!-- 近六场 -->
+    <section>
+      <div class="section-title">
+        <h2>近六场表现</h2>
+        <span class="section-note">XG 为预期进球，XGA 为预期失球</span>
+      </div>
+      <div class="recent-compare" id="recentCompare"></div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>足球脉动 Football Pulse · 实时数据为演示模拟</p>
+    </div>
+  </footer>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/match.js"></script>
+</body>
+</html>

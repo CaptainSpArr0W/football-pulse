@@ -1,0 +1,17 @@
+{
+  "name": "football-pulse",
+  "version": "1.0.0",
+  "description": "足球赛事数据平台 - 赛程赔率一览、球队深度分析、比赛实时 XG 指数",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}

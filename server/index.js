@@ -1,0 +1,95 @@
+/*
+ * Football Pulse 服务器入口
+ * - 静态资源：public/
+ * - REST API：/api/*
+ * - 实时推送：WebSocket /ws（比赛进行中的 XG / 比分 / 事件）
+ */
+const path = require('path');
+const express = require('express');
+const { WebSocketServer } = require('ws');
+const http = require('http');
+const store = require('./store');
+
+const PORT = process.env.PORT || 3000;
+const app = express();
+
+app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.json());
+
+/* ---------- REST API ---------- */
+
+/* 总览：可用日期、赛事分类、每日赛程 */
+app.get('/api/overview', (req, res) => {
+  const dates = store.availableDates();
+  const byDate = {};
+  for (const d of dates) byDate[d] = store.matchesByDate(d);
+  res.json({ today: store.today, dates, competitions: store.competitions(), byDate });
+});
+
+/* 按日期查赛事 */
+app.get('/api/matches', (req, res) => {
+  const { date } = req.query;
+  const list = date ? store.matchesByDate(date) : store.matches;
+  res.json({ date: date || null, matches: list });
+});
+
+/* 球队列表 */
+app.get('/api/teams', (req, res) => res.json({ teams: store.teams() }));
+
+/* 球队详情：档案 + 阵容 + 近六场 + 舆论 + 相关赛事 */
+app.get('/api/team/:id', (req, res) => {
+  const team = store.team(req.params.id);
+  if (!team) return res.status(404).json({ error: '球队不存在' });
+  res.json({ team });
+});
+
+/* 单场详情 */
+app.get('/api/match/:id', (req, res) => {
+  const m = store.matchById(req.params.id);
+  if (!m) return res.status(404).json({ error: '赛事不存在' });
+  res.json({ match: m });
+});
+
+/* ---------- HTTP 服务器 ---------- */
+const server = http.createServer(app);
+
+/* ---------- WebSocket 实时推送 ---------- */
+const wss = new WebSocketServer({ server, path: '/ws' });
+const pushOnline = () => store.broadcast({ type: 'online-count', count: store.onlineCount() });
+wss.on('connection', (ws) => {
+  store.addClient(ws);
+  ws.on('close', pushOnline);
+  pushOnline();
+  // 连接建立后立即推送当前进行中的比赛快照
+  for (const m of store.matches) {
+    if (m.status === 'live') {
+      ws.send(JSON.stringify({
+        type: 'live-update',
+        matchId: m.id,
+        minute: m.minute,
+        half: m.minute <= 45 ? '上半场' : '下半场',
+        status: m.status,
+        score: m.score,
+        xg: m.xg,
+        stats: m.stats || null,
+        events: m.events.slice(-6),
+        homeTeam: m.home.id,
+        awayTeam: m.away.id,
+      }));
+    }
+  }
+});
+/* 在线人数定时刷新（每 10 秒） */
+setInterval(pushOnline, 10000);
+
+/* ---------- 真实数据同步（可选，需 FOOTBALL_API_KEY） ---------- */
+const fetcher = require('./fetcher');
+fetcher.start(store);
+
+server.listen(PORT, () => {
+  store.boot();
+  console.log(`⚽ Football Pulse 已启动`);
+  console.log(`   页面地址   http://localhost:${PORT}`);
+  console.log(`   实时推送   ws://localhost:${PORT}/ws`);
+  console.log(`   进行中比赛 ${store.engine.running().length} 场，XG 引擎已运行`);
+});

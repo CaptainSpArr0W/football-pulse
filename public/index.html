@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>足球脉动 · 赛事数据平台</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="top-strip">
+      <div class="wrap top-strip-inner">
+        <span>已订阅人数：<b id="subCount">--</b></span>
+        <span>当前在线人数：<b id="onlineCount">--</b></span>
+      </div>
+    </div>
+    <div class="wrap header-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">
+          <strong>足球脉动</strong>
+          <em>FOOTBALL PULSE</em>
+        </span>
+      </a>
+      <nav class="date-nav" id="dateNav" aria-label="日期切换">
+        <button class="date-btn" data-shift="-1">昨天</button>
+        <button class="date-btn is-today" data-shift="0">今天</button>
+        <button class="date-btn" data-shift="1">明天</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- 今日信息 + 联赛筛选 -->
+    <section class="page-head">
+      <h1 id="pageTitle">今日赛程</h1>
+      <p class="page-sub" id="pageSub">加载中…</p>
+      <div class="filter-bar">
+        <div class="filters" id="compFilters" role="tablist"></div>
+        <select class="comp-select" id="compSelect" aria-label="选择其他联赛">
+          <option value="">更多联赛</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- 进行中的比赛：实时 XG -->
+    <section class="live-section" id="liveSection" hidden>
+      <div class="section-title">
+        <h2><span class="live-dot" aria-hidden="true"></span>进行中 · 实时数据</h2>
+        <span class="section-note">XG 为预期进球指数，数据实时推送</span>
+      </div>
+      <div class="live-grid" id="liveGrid"></div>
+    </section>
+
+    <!-- 赛程列表 -->
+    <section class="matches-section">
+      <div class="section-title">
+        <h2 id="listTitle">比赛列表</h2>
+        <span class="section-note" id="listNote"></span>
+      </div>
+      <div class="match-list" id="matchList"></div>
+      <div class="empty-state" id="emptyState" hidden>
+        <p>该日期暂无赛事安排</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>足球脉动 Football Pulse · 数据为演示模拟，点击球队名称可查看阵容、近况与舆论分析</p>
+    </div>
+  </footer>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/index.js"></script>
+</body>
+</html>
