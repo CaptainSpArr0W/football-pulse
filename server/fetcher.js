@@ -306,7 +306,7 @@ function pushUpdate(store, match) {
     score: match.score,
     xg: match.xg || { home: 0, away: 0 },
     stats: null,
-    events: [],
+    events: (match.events || []).slice(-6),
     homeTeam: match.home.id,
     awayTeam: match.away.id,
   });
@@ -350,6 +350,14 @@ async function syncOnce(store) {
     }
 
     for (const m of changed) pushUpdate(store, m);
+
+    // API-Football 补充：赔率 + 真实事件流（免费档按需 + 缓存）
+    const apiFb = require('./apifootball');
+    if (apiFb.isEnabled()) {
+      const evChanged = await apiFb.syncApifootball(store);
+      for (const m of evChanged) pushUpdate(store, m);
+    }
+
     store.broadcast({ type: 'data-refreshed', at: Date.now(), matches: store.matches.length });
     log(`同步完成：接口 ${fixtures.length} 场，更新 ${changed.length} 场，球队 ${store.teamIndex.size} 支`);
     return { ok: true, updated: changed.length };

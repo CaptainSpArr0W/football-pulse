@@ -60,7 +60,7 @@ function europeTable(match) {
     <thead><tr><th></th><th>主胜</th><th>平局</th><th>客胜</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <div class="odds-note">体彩竞彩胜平负</div>`;
+  <div class="odds-note">胜平负赔率 · 数据来源 API-Football</div>`;
 }
 
 function asianTable(match) {

@@ -8,6 +8,8 @@
 | --- | --- |
 | 赛程一览 | 按日期（昨天 / 今天 / 明天）与赛事分类筛选，覆盖五大联赛、英冠、葡超、荷甲、巴西甲、欧冠等 13 项赛事（免费档实际开放） |
 | 实时比分 | 进行中的比赛实时推送比分与比赛分钟（WebSocket） |
+| 赔率数据 | 可选接入 API-Football：欧赔 / 亚盘 / 大小球 / 角球（赛前与滚球） |
+| 事件流 | 可选接入 API-Football：进球、点球、红黄牌、换人的真实事件时间线 |
 | 球队档案 | 点击任意球队名称进入详情页，查看首发阵容阵型图、近六场真实战绩与球队状态串（队名自动翻译为中文，英文名保留于详情页） |
 | 真实数据 | 全部来自 football-data.org v4：赛程、比分、状态、首发阵容、球队近六场 |
 | 历史复盘 | 独立入口「历史复盘」：StatsBomb Open Data 真实 XG、射门分布图、事件时间线、统计与首发阵容（覆盖至 2023/24 赛季） |
@@ -40,6 +42,21 @@ npm start       # 启动服务
 免费档 API 实际开放 13 项赛事（配置于 `server/data/competitions.js`）：英超、西甲、德甲、意甲、法甲、英冠、葡超、荷甲、巴西甲、欧冠、解放者杯、欧洲杯、世界杯。未开放的赛事（如韩K、日职、沙特甲等）不会出现在站点中。
 
 免费档不提供的字段（赔率、XG、事件流、实时统计、舆论）对应区块会隐藏或显示「暂无数据」占位，不会出现模拟值。
+
+## 接入 API-Football（赔率 + 事件流，可选）
+
+[API-Football](https://www.api-football.com) 免费档（100 次/天）提供赛前/滚球赔率与逐场事件。配置后站点自动展示赔率板块与事件时间线，未配置则保持隐藏：
+
+1. 在 [dashboard.api-football.com](https://dashboard.api-football.com) 注册并复制 API Key（免费，无需信用卡）。
+2. 配置密钥（二选一）：
+   - 复制 `server/data/apifootball-config.example.json` 为 `server/data/apifootball-config.json` 并填入 key（已被 `.gitignore` 排除）；
+   - 或设置环境变量 `API_FOOTBALL_KEY`。
+3. 重启服务。服务端会自动把 football-data 比赛与 API-Football 比赛按队名匹配，然后：
+   - 每日拉取当日比赛赔率（欧赔 / 亚盘 / 大小球 / 角球，每场 1 次请求，缓存 30 分钟）；
+   - 直播中比赛每 5 分钟同步事件流（进球 / 点球 / 红黄牌 / 换人），并随 WebSocket 实时推送；
+   - 打开比赛详情页时按需补充赔率与事件（缓存命中不消耗配额）。
+
+免费档配额为 100 次/天，服务端做了预算管理：按需拉取 + 长缓存，超出安全阈值（90 次）自动暂停请求并在控制台提示，不影响站点其它功能。
 
 ## 历史深度复盘（StatsBomb Open Data）
 
@@ -77,11 +94,13 @@ football-pulse/
 │   ├── index.js            # Express + WebSocket 入口
 │   ├── store.js            # 内存数据仓库（启动为空，由 fetcher 填充）
 │   ├── fetcher.js          # 真实数据同步层（football-data.org，含限流）
+│   ├── apifootball.js      # 赔率 + 事件流补充层（API-Football，含配额预算）
 │   ├── statsbomb.js        # 历史复盘数据层（StatsBomb Open Data）
 │   └── data/
 │       ├── competitions.js # 可接入赛事配置（免费档开放的 13 项）
 │       ├── team-names.js   # 球队中英文名对照表（未收录保留英文）
-│       └── api-config.example.json  # API 配置模板（复制为 api-config.json 使用）
+│       ├── api-config.example.json  # football-data API 配置模板
+│       └── apifootball-config.example.json # API-Football 配置模板
 ├── public/
 │   ├── index.html          # 首页：赛程 + 实时比分
 │   ├── match.html          # 比赛详情页

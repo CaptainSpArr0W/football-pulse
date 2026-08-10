@@ -85,7 +85,7 @@ class Store {
   }
 
   matchById(id) {
-    const m = this.matches.find((x) => x.id === id || String(x.apiId) === id);
+    const m = this.rawMatchById(id);
     if (!m) return null;
     const pm = this._publicMatch(m);
     const ht = this.teamIndex.get(m.home.id);
@@ -101,6 +101,11 @@ class Store {
       formation: (at && at.formation) || '', lineup: (at && at.lineup) || null, recent: (at && at.recent) || [],
     };
     return pm;
+  }
+
+  /* 内部原始比赛对象（供 fetcher / apifootball 直接读写） */
+  rawMatchById(id) {
+    return this.matches.find((x) => x.id === id || String(x.apiId) === id) || null;
   }
 
   team(id) {

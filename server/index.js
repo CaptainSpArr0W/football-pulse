@@ -43,11 +43,19 @@ app.get('/api/team/:id', (req, res) => {
   res.json({ team });
 });
 
-/* 单场详情 */
-app.get('/api/match/:id', (req, res) => {
-  const m = store.matchById(req.params.id);
-  if (!m) return res.status(404).json({ error: '赛事不存在' });
-  res.json({ match: m });
+/* 单场详情（按需补充 API-Football 赔率与事件） */
+app.get('/api/match/:id', async (req, res) => {
+  const raw = store.rawMatchById(req.params.id);
+  if (!raw) return res.status(404).json({ error: '赛事不存在' });
+  const apiFb = require('./apifootball');
+  if (apiFb.isEnabled() && raw.apiFixtureId) {
+    try {
+      await apiFb.ensureForMatch(raw);
+    } catch (err) {
+      console.log(`[apifootball] 单场补充失败 ${raw.id}：${err.message}`);
+    }
+  }
+  res.json({ match: store.matchById(req.params.id) });
 });
 
 /* ---------- StatsBomb 历史深度复盘 ---------- */
