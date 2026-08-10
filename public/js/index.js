@@ -5,7 +5,7 @@
   const state = {
     overview: null,
     selectedDate: null,
-    selectedComp: null, // null = 五大联赛全部
+    selectedComp: null, // null = 全部赛事
   };
 
   const $ = (sel) => document.querySelector(sel);
@@ -63,7 +63,7 @@
     });
   }
 
-  /* ---------- 联赛筛选：五大联赛标签 + 其他联赛下拉 ---------- */
+  /* ---------- 联赛筛选：联赛标签 + 更多联赛下拉 ---------- */
   function renderFilters() {
     const wrap = $('#compFilters');
     wrap.innerHTML = BIG_FIVE
@@ -108,7 +108,7 @@
   /* ---------- 页面标题 ---------- */
   function renderHead() {
     const isToday = state.selectedDate === state.overview.today;
-    const titleComp = state.selectedComp ? `${state.selectedComp} · ` : '五大联赛 · ';
+    const titleComp = state.selectedComp ? `${state.selectedComp} · ` : '';
     $('#pageTitle').textContent = isToday ? `${titleComp}今日赛程` : `${titleComp}${monthDay(state.selectedDate)} ${weekdayOf(state.selectedDate)}`;
     const total = (state.overview.byDate[state.selectedDate] || []).length;
     $('#pageSub').textContent = `数据来源 football-data.org · 当日共 ${total} 场比赛`;
