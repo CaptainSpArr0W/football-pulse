@@ -30,10 +30,11 @@ const KEY = process.env.API_FOOTBALL_KEY || loadConfig().key || '';
 function log(msg) { console.log(`[apifootball] ${msg}`); }
 const notify = require('./notify');
 
-/* ---------- 每日配额（按北京时间自然日重置，0 点整点重置 + 惰性兜底；持久化防重启丢失） ---------- */
+/* ---------- 每日配额（与 API 的 UTC 自然日对齐：UTC 午夜重置 = 北京时间 08:00，避免跨时区死区） ---------- */
 const THRESHOLDS = [50, 75, 90]; // 用量百分比告警阈值
 const USAGE_FILE = path.join(__dirname, 'data', 'apifootball-usage.json');
 const budget = loadBudget();
+let quotaPausedUntil = 0; // API 侧配额耗尽后的暂停截止时间戳（UTC 午夜）
 
 function loadBudget() {
   try {
@@ -62,23 +63,30 @@ function bjToday() {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 
+/* API 配额按 UTC 自然日统计（与 api-sports 免费档重置时刻一致） */
+function quotaDay() {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
 /* 到达新的一天时重置配额（每次访问时检查，保证任何时刻状态一致） */
 function ensureDailyReset() {
-  const t = bjToday();
+  const t = quotaDay();
   if (budget.date !== t) {
     budget.date = t;
     budget.count = 0;
     budget.alerted.clear();
+    quotaPausedUntil = 0;
     saveBudget();
     log(`配额已按天重置（${t}，上限 ${DAILY_LIMIT} 次/天）`);
   }
 }
 
-/* 定时器：在北京时间午夜 0 点整点重置（与惰性检查双保险） */
+/* 定时器：在 UTC 午夜（北京时间 08:00）整点重置，与 API 重置时刻对齐 */
 function scheduleMidnightReset() {
-  const bj = new Date(Date.now() + 8 * 3600 * 1000);
+  const now = new Date();
   const msToMidnight = 24 * 3600 * 1000
-    - ((bj.getUTCHours() * 3600 + bj.getUTCMinutes() * 60 + bj.getUTCSeconds()) * 1000 + bj.getUTCMilliseconds());
+    - ((now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds()) * 1000 + now.getUTCMilliseconds());
   setTimeout(() => {
     ensureDailyReset();
     scheduleMidnightReset();
@@ -106,24 +114,42 @@ function usage() {
   return budget.count;
 }
 
-/* 用量告警：跨越阈值（50/75/90%）与配额耗尽时发送邮件，当天每个阈值只发一次 */
+/* API 侧配额耗尽：暂停请求到下一个 UTC 午夜（不发请求，仅发送一次告警邮件） */
+function pauseQuota() {
+  ensureDailyReset();
+  if (quotaPausedUntil) return;
+  const now = new Date();
+  const until = new Date(now);
+  until.setUTCHours(24, 0, 0, 0);
+  quotaPausedUntil = until.getTime();
+  log(`API-Football 日配额已耗尽，已暂停请求至 UTC 午夜自动恢复`);
+  if (!budget.alerted.has(100)) {
+    budget.alerted.add(100);
+    saveBudget();
+    notify.alert('apifb-quota-exhausted',
+      `足球脉动 · API-Football 配额已耗尽（${bjToday()}）`,
+      `今日 ${DAILY_LIMIT} 次配额已全部用完，API-Football 请求已暂停，北京时间次日 08:00（UTC 午夜）自动恢复。`);
+  }
+}
+
+function quotaPaused() {
+  ensureDailyReset();
+  return quotaPausedUntil > Date.now();
+}
+
+/* 用量告警：跨越阈值（50/75/90%）时发送邮件，当天每个阈值只发一次 */
 function checkThresholds(used) {
   const pct = Math.round((used / DAILY_LIMIT) * 100);
   const remain = Math.max(0, DAILY_LIMIT - used);
   for (const t of THRESHOLDS) {
     if (pct >= t && !budget.alerted.has(t)) {
       budget.alerted.add(t);
+      saveBudget();
       notify.alert(`apifb-quota-${t}`,
-        `足球脉动 · API-Football 配额告警（${budget.date}）`,
+        `足球脉动 · API-Football 配额告警（${bjToday()}）`,
         `API-Football 免费档今日配额已用 ${used}/${DAILY_LIMIT}（${pct}%），剩余 ${remain} 次。\n` +
         `超过 90 次后服务将暂停 API-Football 请求，实时比分仍由 football-data.org 支撑。`);
     }
-  }
-  if (used >= DAILY_LIMIT && !budget.alerted.has(100)) {
-    budget.alerted.add(100);
-    notify.alert('apifb-quota-exhausted',
-      `足球脉动 · API-Football 配额已耗尽（${budget.date}）`,
-      `今日 ${DAILY_LIMIT} 次配额已全部用完，API-Football 请求已暂停，北京时间次日 0 点自动恢复。`);
   }
 }
 
@@ -139,13 +165,18 @@ async function throttled(fn) {
 async function api(pathname, ttlMs) {
   const hit = cache.get(pathname);
   if (hit && Date.now() - hit.ts < hit.ttl) return hit.data;
-  if (overBudget()) throw new Error('今日 API-Football 配额已达上限');
+  if (overBudget() || quotaPaused()) throw new Error('API-Football 配额已暂停');
   return throttled(async () => {
     const res = await fetch(BASE + pathname, { headers: { 'x-apisports-key': KEY } });
     if (res.status === 401) throw new Error('API-Football key 无效');
-    if (res.status === 429) throw new Error('API-Football 请求超限(429)');
+    if (res.status === 429) { pauseQuota(); throw new Error('API-Football 请求超限(429)'); }
     if (!res.ok) throw new Error(`API-Football HTTP ${res.status}`);
     const j = await res.json();
+    // 免费档日配额耗尽：API 返回 200 + errors.requests（该次请求已被计数，立即暂停不再重试）
+    if (j && j.errors && j.errors.requests) {
+      pauseQuota();
+      throw new Error('API-Football 日配额已耗尽，已暂停请求');
+    }
     useBudget();
     cache.set(pathname, { data: j, ts: Date.now(), ttl: ttlMs });
     return j;
@@ -191,7 +222,15 @@ async function fixturesByDate(date) {
     home: { id: f.teams.home.id, name: f.teams.home.name },
     away: { id: f.teams.away.id, name: f.teams.away.name },
     status: f.fixture && f.fixture.status && f.fixture.status.short,
+    minute: f.fixture && f.fixture.status && f.fixture.status.elapsed,
     goals: (f.goals && { home: f.goals.home, away: f.goals.away }) || { home: null, away: null },
+    league: {
+      id: f.league && f.league.id,
+      name: f.league && f.league.name,
+      country: f.league && f.league.country,
+      round: f.league && f.league.round,
+    },
+    kickoffTs: f.fixture && f.fixture.timestamp, // unix 秒
   }));
 }
 
@@ -205,13 +244,23 @@ async function apiWithRetry(pathname, ttlMs) {
   return j;
 }
 
-/* 为 store 中窗口内比赛绑定 API fixtureId（按双方队名匹配，跨时区：拉取北京-2 至 +1 天的 UTC 赛程） */
-async function attachFixtureIds(store) {
-  const utcDates = [bjDate(-2), bjDate(-1), bjDate(0), bjDate(1)];
+/* 窗口内全部赛程：北京 -2 天 ~ +5 天对应 UTC -3 ~ +5 共 9 个日期（缓存 12h，跨日自动过期） */
+async function windowFixtures() {
   const fixtures = [];
-  for (const d of utcDates) {
-    try { fixtures.push(...await fixturesByDate(d)); } catch (err) { log(`赛程 ${d} 拉取失败：${err.message}`); }
+  for (let i = -3; i <= 5; i++) {
+    const d = bjDate(i);
+    try {
+      fixtures.push(...await fixturesByDate(d));
+    } catch (err) {
+      log(`赛程 ${d} 拉取失败：${err.message}`);
+    }
   }
+  return fixtures;
+}
+
+/* 为 store 中窗口内比赛绑定 API fixtureId（按双方队名匹配，跨时区） */
+async function attachFixtureIds(store) {
+  const fixtures = await windowFixtures();
   let hit = 0;
   // store 中比赛只存球队 id，英文名需从 teamIndex 解析（en 为英文全名）
   const nameOf = (m, side) => {
@@ -421,19 +470,19 @@ async function syncApifootball(store) {
     const today = bjToday();
     await attachFixtureIds(store);
 
-    // 今日比赛赔率（30 分钟缓存；直播中 5 分钟）
+    // 今日比赛赔率（30 分钟缓存；直播中 5 分钟；额外联赛按需拉取不占后台配额）
     for (const m of store.matches) {
-      if (m.date !== today || !m.apiFixtureId) continue;
+      if (m.date !== today || !m.apiFixtureId || m._extra) continue;
       try {
         const odds = await oddsFor(m.apiFixtureId, m.status);
         if (odds) m.odds = odds;
       } catch (err) { log(`赔率失败 ${m.id}：${err.message}`); }
     }
 
-    // 直播/已完场事件（5 分钟 / 6 小时缓存，缓存即限流）
+    // 直播/已完场事件（5 分钟 / 6 小时缓存，缓存即限流；额外联赛按需拉取）
     const changed = [];
     for (const m of store.matches) {
-      if (!m.apiFixtureId || (m.status !== 'live' && m.status !== 'finished')) continue;
+      if (!m.apiFixtureId || m._extra || (m.status !== 'live' && m.status !== 'finished')) continue;
       try {
         const raw = await eventsFor(m.apiFixtureId, m.status);
         const events = finalizeEvents(m, raw);
@@ -473,6 +522,7 @@ module.exports = {
   isEnabled: () => !!KEY,
   syncApifootball,
   ensureForMatch,
+  windowFixtures,
   usage,
   DAILY_LIMIT: DAILY_LIMIT,
 };

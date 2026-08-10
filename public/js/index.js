@@ -63,15 +63,20 @@
     });
   }
 
-  /* ---------- 联赛筛选：联赛标签 + 更多联赛下拉 ---------- */
+  /* ---------- 联赛筛选：全部 + 五大联赛标签 + 更多联赛下拉 ---------- */
   function renderFilters() {
     const wrap = $('#compFilters');
-    wrap.innerHTML = BIG_FIVE
-      .map((c) => `<button class="filter-chip${state.selectedComp === c ? ' active' : ''}" data-comp="${esc(c)}">${esc(c)}</button>`)
-      .join('');
+    wrap.innerHTML = '<button class="filter-chip' + (state.selectedComp === null ? ' active' : '') + '" data-comp="__ALL__">全部</button>' +
+      BIG_FIVE
+        .map((c) => `<button class="filter-chip${state.selectedComp === c ? ' active' : ''}" data-comp="${esc(c)}">${esc(c)}</button>`)
+        .join('');
     wrap.querySelectorAll('.filter-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
-        state.selectedComp = state.selectedComp === chip.dataset.comp ? null : chip.dataset.comp;
+        if (chip.dataset.comp === '__ALL__') {
+          state.selectedComp = null;
+        } else {
+          state.selectedComp = state.selectedComp === chip.dataset.comp ? null : chip.dataset.comp;
+        }
         syncSelect();
         renderFilters();
         renderMatchList();
@@ -96,7 +101,10 @@
 
   function syncFilters() {
     $('#compFilters').querySelectorAll('.filter-chip').forEach((chip) => {
-      chip.classList.toggle('active', chip.dataset.comp === state.selectedComp);
+      const active = chip.dataset.comp === '__ALL__'
+        ? state.selectedComp === null
+        : chip.dataset.comp === state.selectedComp;
+      chip.classList.toggle('active', active);
     });
   }
 
@@ -117,7 +125,7 @@
 
   function visibleMatches() {
     const list = state.overview.byDate[state.selectedDate] || [];
-    if (!state.selectedComp) return list.filter((m) => BIG_FIVE.includes(m.competition));
+    if (!state.selectedComp) return list; // 未筛选 = 全部联赛
     return list.filter((m) => m.competition === state.selectedComp);
   }
 

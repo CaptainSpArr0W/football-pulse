@@ -12,7 +12,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { CODES, BIG_FIVE } = require('./data/competitions');
+const { CODES, BIG_FIVE, EXTRA_LEAGUES } = require('./data/competitions');
 const TEAM_NAMES_ZH = require('./data/team-names');
 
 const BASE = 'https://api.football-data.org/v4';
@@ -34,6 +34,7 @@ const KEY = process.env.FOOTBALL_API_KEY || CONFIG.key || '';
 const INTERVAL_MS = Math.max(1, Number(process.env.SYNC_INTERVAL_MIN || CONFIG.intervalMin || 5)) * 60 * 1000;
 
 const NAME_BY_CODE = CODES;
+for (const l of EXTRA_LEAGUES) NAME_BY_CODE[l.code] = l.name;
 
 /* ---------- 工具 ---------- */
 
@@ -190,6 +191,84 @@ function applyToStore(store, fx) {
   return m;
 }
 
+/* ---------- 额外联赛（API-Football 补充数据源） ---------- */
+
+/* API-Football 比赛状态 → football-data 状态字符串（复用 buildMatch 的 statusOf） */
+function apiFbStatusOf(short) {
+  const live = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'SUSP', 'INT', 'LIVE']);
+  const done = new Set(['FT', 'AET', 'PEN', 'AWD']);
+  if (live.has(short)) return 'IN_PLAY';
+  if (done.has(short)) return 'FINISHED';
+  return 'TIMED'; // NS / TBD / PST / CANC / ABD / WO
+}
+
+/* 从 API-Football 赛程项构造 football-data 风格的 fixture（供 applyToStore 复用） */
+function apiFbFixtureToFx(f, league) {
+  let matchday = null;
+  const r = String((f.league && f.league.round) || '');
+  const m = /regular season\s*-\s*(\d+)/i.exec(r);
+  if (m) matchday = Number(m[1]);
+  const utcDate = f.kickoffTs ? new Date(f.kickoffTs * 1000).toISOString() : new Date().toISOString();
+  return {
+    id: f.id,
+    competition: { code: league.code, name: league.name },
+    utcDate,
+    status: apiFbStatusOf(f.status),
+    minute: (f.status && apiFbStatusOf(f.status) === 'IN_PLAY') ? f.minute : null,
+    matchday,
+    score: { fullTime: { home: f.goals.home, away: f.goals.away } },
+    homeTeam: { id: f.home.id, name: f.home.name, shortName: f.home.name },
+    awayTeam: { id: f.away.id, name: f.away.name, shortName: f.away.name },
+  };
+}
+
+/* 赛程项是否属于配置的额外联赛（联赛名称 + 国家双重匹配，防误配） */
+function matchExtraLeague(apiFixture) {
+  const ln = String((apiFixture.league && apiFixture.league.name) || '');
+  const cn = String((apiFixture.league && apiFixture.league.country) || '');
+  for (const l of EXTRA_LEAGUES) {
+    if (l.apifbName && !l.apifbName.test(ln)) continue;
+    if (l.apifbCountry && !l.apifbCountry.test(cn)) continue;
+    if (!l.apifbName && !l.apifbCountry) continue;
+    return l;
+  }
+  return null;
+}
+
+/* 同步额外联赛赛程/比分到 store（与 football-data 比赛同结构，_extra 标记；赔率事件按需拉取） */
+async function syncExtra(store) {
+  const apiFb = require('./apifootball');
+  if (!apiFb.isEnabled()) return [];
+  try {
+    const fixtures = await apiFb.windowFixtures();
+    if (!global.__apifbLeagueDebug) {
+      global.__apifbLeagueDebug = true;
+      const names = [...new Set(fixtures.map((f) => `${f.league.country}|${f.league.name}`))];
+      log(`赛程共 ${fixtures.length} 条，包含联赛：${names.slice(0, 50).join('、')}`);
+    }
+    const changed = [];
+    for (const f of fixtures) {
+      const league = matchExtraLeague(f);
+      if (!league) continue;
+      const fx = apiFbFixtureToFx(f, league);
+      const m = applyToStore(store, fx);
+      if (!m) continue;
+      m._extra = true;
+      m.apiFixtureId = f.id;
+      m.apiHomeId = f.home.id;
+      m.apiAwayId = f.away.id;
+      const ht = store.teamIndex.get(m.home.id); if (ht) ht._extra = true;
+      const at = store.teamIndex.get(m.away.id); if (at) at._extra = true;
+      changed.push(m);
+    }
+    if (changed.length) log(`额外联赛（API-Football）同步 ${changed.length} 场`);
+    return changed;
+  } catch (err) {
+    log(`额外联赛同步失败：${err.message}`);
+    return [];
+  }
+}
+
 /* ---------- 阵容同步 ---------- */
 
 /* 阵型模板：每个槽位 [角色, x, y]，坐标沿用项目 pos 体系 */
@@ -322,7 +401,7 @@ async function syncOnce(store) {
       d.setUTCDate(d.getUTCDate() + n);
       return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
     };
-    const j = await api(`/matches?dateFrom=${off(-1)}&dateTo=${off(1)}`);
+    const j = await api(`/matches?dateFrom=${off(-2)}&dateTo=${off(5)}`);
     const fixtures = j.matches || [];
     const changed = [];
     for (const fx of fixtures) {
@@ -330,9 +409,12 @@ async function syncOnce(store) {
       if (m) changed.push(m);
     }
 
-    // 直播/已完场：同步首发阵容（每场一次，限流）
+    // 额外联赛（韩K/日职/沙特甲等，API-Football 数据源）
+    changed.push(...await syncExtra(store));
+
+    // 直播/已完场：同步首发阵容（每场一次，限流；额外联赛走 API-Football 不在此列）
     for (const m of store.matches) {
-      if ((m.status === 'live' || m.status === 'finished') && !m._lineupFetched) {
+      if ((m.status === 'live' || m.status === 'finished') && !m._lineupFetched && !m._extra) {
         await fetchLineupsFor(store, m);
       }
     }
@@ -343,7 +425,7 @@ async function syncOnce(store) {
     let n = 0;
     for (const tid of involved) {
       const t = store.teamIndex.get(tid);
-      if (t && (!t._recentFetchedAt || Date.now() - t._recentFetchedAt > 30 * 60 * 1000) && n < 10) {
+      if (t && !t._extra && (!t._recentFetchedAt || Date.now() - t._recentFetchedAt > 30 * 60 * 1000) && n < 10) {
         await fetchRecentFor(store, tid);
         n++;
       }
@@ -386,4 +468,4 @@ function stop() {
   timer = null;
 }
 
-module.exports = { start, stop, syncOnce, todayStr, CODES, BIG_FIVE };
+module.exports = { start, stop, syncOnce, todayStr, CODES, BIG_FIVE, syncExtra, matchExtraLeague, apiFbFixtureToFx, apiFbStatusOf };

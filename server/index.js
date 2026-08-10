@@ -18,12 +18,18 @@ app.use(express.json());
 
 /* ---------- REST API ---------- */
 
-/* 总览：可用日期、赛事分类、每日赛程 */
+/* 总览：可用日期、赛事分类、每日赛程（competitions 始终列出全部配置联赛） */
 app.get('/api/overview', (req, res) => {
   const dates = store.availableDates();
   const byDate = {};
   for (const d of dates) byDate[d] = store.matchesByDate(d).map((m) => store._publicMatch(m));
-  res.json({ today: store.today, dates, competitions: store.competitions(), byDate });
+  const { ALL_LEAGUES } = require('./data/competitions');
+  res.json({
+    today: store.today,
+    dates,
+    competitions: [...new Set([...ALL_LEAGUES, ...store.competitions()])],
+    byDate,
+  });
 });
 
 /* 按日期查赛事 */
