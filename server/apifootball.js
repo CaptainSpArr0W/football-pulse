@@ -55,20 +55,29 @@ function usage() {
   return budget.count;
 }
 
-/* ---------- 请求 + 缓存 ---------- */
+/* ---------- 请求 + 缓存（含免费档限流：6 秒间隔 ≈ 10 次/分钟） ---------- */
 const cache = new Map(); // key -> { data, ts, ttl }
+let lastCallAt = 0;
+async function throttled(fn) {
+  const wait = Math.max(0, 6000 - (Date.now() - lastCallAt));
+  if (wait) await new Promise((r) => setTimeout(r, wait));
+  lastCallAt = Date.now();
+  return fn();
+}
 async function api(pathname, ttlMs) {
   const hit = cache.get(pathname);
   if (hit && Date.now() - hit.ts < hit.ttl) return hit.data;
   if (overBudget()) throw new Error('今日 API-Football 配额已达上限');
-  const res = await fetch(BASE + pathname, { headers: { 'x-apisports-key': KEY } });
-  if (res.status === 401) throw new Error('API-Football key 无效');
-  if (res.status === 429) throw new Error('API-Football 请求超限(429)');
-  if (!res.ok) throw new Error(`API-Football HTTP ${res.status}`);
-  const j = await res.json();
-  useBudget();
-  cache.set(pathname, { data: j, ts: Date.now(), ttl: ttlMs });
-  return j;
+  return throttled(async () => {
+    const res = await fetch(BASE + pathname, { headers: { 'x-apisports-key': KEY } });
+    if (res.status === 401) throw new Error('API-Football key 无效');
+    if (res.status === 429) throw new Error('API-Football 请求超限(429)');
+    if (!res.ok) throw new Error(`API-Football HTTP ${res.status}`);
+    const j = await res.json();
+    useBudget();
+    cache.set(pathname, { data: j, ts: Date.now(), ttl: ttlMs });
+    return j;
+  });
 }
 
 /* ---------- 队名归一化（用于两套数据源的球队匹配） ---------- */
@@ -77,12 +86,36 @@ const _norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u
   .replace(/[^a-z0-9]+/g, '');
 function normTeam(name) { return _norm(name); }
 
+/* 包含式匹配：Botafogo FR 与 Botafogo、SC Corinthians Paulista 与 Corinthians 均视为同一队 */
+function teamMatch(a, b) {
+  if (!a || !b || a.length < 3 || b.length < 3) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
 /* ---------- 当日赛程（获取 API 侧 fixtureId / 队ID / 实时比分） ---------- */
+
+/* 北京时区日期偏移（返回 yyyy-MM-dd 字符串） */
+function bjDate(offsetDays) {
+  const d = new Date(Date.now() + 8 * 3600 * 1000);
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+/* 按 UTC 单日拉取赛程（API-Football 仅支持 date= 单日查询，dateFrom/dateTo 无效；按 paging 自动翻页） */
 async function fixturesByDate(date) {
-  const j = await api(`/fixtures?date=${date}`, 12 * 3600 * 1000);
-  return (j.response || []).map((f) => ({
+  const out = [];
+  let page = 1;
+  let total = 1;
+  while (page <= total) {
+    const suffix = page > 1 ? `&page=${page}` : '';
+    const j = await apiWithRetry(`/fixtures?date=${date}${suffix}`, 12 * 3600 * 1000);
+    const p = j.paging || {};
+    total = p.total || 1;
+    out.push(...(j.response || []));
+    page += 1;
+  }
+  return out.map((f) => ({
     id: f.fixture && f.fixture.id,
-    date: (f.fixture && f.fixture.date) || '',
     home: { id: f.teams.home.id, name: f.teams.home.name },
     away: { id: f.teams.away.id, name: f.teams.away.name },
     status: f.fixture && f.fixture.status && f.fixture.status.short,
@@ -90,15 +123,37 @@ async function fixturesByDate(date) {
   }));
 }
 
-/* 为 store 中某日的比赛绑定 API fixtureId（按双方队名匹配） */
-async function attachFixtureIds(store, date) {
-  const fixtures = await fixturesByDate(date);
+/* 免费档偶发返回空结果（限流瞬时态），重试一次 */
+async function apiWithRetry(pathname, ttlMs) {
+  const j = await api(pathname, ttlMs);
+  if (j && j.results === 0) {
+    await new Promise((r) => setTimeout(r, 8000));
+    return api(pathname, ttlMs);
+  }
+  return j;
+}
+
+/* 为 store 中窗口内比赛绑定 API fixtureId（按双方队名匹配，跨时区：拉取北京-2 至 +1 天的 UTC 赛程） */
+async function attachFixtureIds(store) {
+  const utcDates = [bjDate(-2), bjDate(-1), bjDate(0), bjDate(1)];
+  const fixtures = [];
+  for (const d of utcDates) {
+    try { fixtures.push(...await fixturesByDate(d)); } catch (err) { log(`赛程 ${d} 拉取失败：${err.message}`); }
+  }
   let hit = 0;
+  // store 中比赛只存球队 id，英文名需从 teamIndex 解析（en 为英文全名）
+  const nameOf = (m, side) => {
+    const t = store.teamIndex.get(m[side].id);
+    return t ? (t.en || t.name || '') : '';
+  };
   for (const m of store.matches) {
-    if (m.date !== date || m.apiFixtureId) continue;
-    const hn = normTeam(m.home.name || '');
-    const an = normTeam(m.away.name || '');
-    const f = fixtures.find((x) => normTeam(x.home.name) === hn && normTeam(x.away.name) === an);
+    if (m.apiFixtureId) continue;
+    const hn = normTeam(nameOf(m, 'home'));
+    const an = normTeam(nameOf(m, 'away'));
+    if (!hn || !an) continue;
+    const f = fixtures.find(
+      (x) => teamMatch(hn, normTeam(x.home.name)) && teamMatch(an, normTeam(x.away.name)),
+    );
     if (f) {
       m.apiFixtureId = f.id;
       m.apiHomeId = f.home.id;
@@ -106,7 +161,7 @@ async function attachFixtureIds(store, date) {
       hit += 1;
     }
   }
-  if (hit) log(`当日 ${date} 绑定 API 比赛 ${hit} 场`);
+  if (hit) log(`绑定 API 比赛 ${hit} 场`);
   return hit;
 }
 
@@ -165,39 +220,53 @@ function mapAsian(bm) {
   for (const x of bet.values) {
     const m = /^(Home|Away)\s*([+-]?\d+(?:\.\d+)?)$/i.exec(x.value);
     if (!m) continue;
-    if (m[1].toLowerCase() === 'home') { line = -parseFloat(m[2]); home = parseFloat(x.odd); }
-    else away = parseFloat(x.odd);
+    const num = parseFloat(m[2]);
+    if (m[1].toLowerCase() === 'home') {
+      // 主队视角：-1.5 = 主让；+1.5 = 主受；无符号默认主让
+      line = m[2].startsWith('+') ? num : (m[2].startsWith('-') ? num : -num);
+      home = parseFloat(x.odd);
+    } else {
+      away = parseFloat(x.odd);
+    }
   }
   if (line == null || home == null || away == null) return null;
   return { bookmaker: zhBook(bm.name), line, home, away, open: true };
 }
 
 function mapTotal(bm) {
-  const bet = bm.bets && bm.bets.find((b) => b.name === 'Goals Over/Under');
+  const bet = bm.bets && bm.bets.find((b) => /^goals over\/under$/i.test(b.name));
   if (!bet || !bet.values) return null;
-  let line, over, under;
-  for (const x of bet.values) {
-    const m = /^(Over|Under)\s+([\d.]+)$/i.exec(x.value);
-    if (!m) continue;
-    if (m[1].toLowerCase() === 'over') { line = parseFloat(m[2]); over = parseFloat(x.odd); }
-    else under = parseFloat(x.odd);
-  }
-  if (line == null || over == null || under == null) return null;
-  return { bookmaker: zhBook(bm.name), line, over, under, open: true };
+  // 多档盘口（1.5 / 2.5 / 3.5...），选取最接近 2.5 的主盘
+  return pickLineBet(bet, 2.5, bm.name);
 }
 
 function mapCorners(bm) {
-  const bet = bm.bets && bm.bets.find((b) => /corner/i.test(b.name) && b.values.some((v) => /^(Over|Under)/i.test(v.value)));
+  const bet = bm.bets && bm.bets.find((b) => /corner.*over.*under|over.*under.*corner/i.test(b.name));
   if (!bet || !bet.values) return null;
-  let line, over, under;
+  // 选取最接近 9.5 的主盘
+  return pickLineBet(bet, 9.5, bm.name);
+}
+
+/* 从含 Over/Under 多档盘口中选出最接近 targetLine 的一档 */
+function pickLineBet(bet, targetLine, bookmakerName) {
+  let best = null;
+  let bestDist = Infinity;
+  let over, under;
   for (const x of bet.values) {
     const m = /^(Over|Under)\s+([\d.]+)$/i.exec(x.value);
     if (!m) continue;
-    if (m[1].toLowerCase() === 'over') { line = parseFloat(m[2]); over = parseFloat(x.odd); }
-    else under = parseFloat(x.odd);
+    if (m[1].toLowerCase() === 'over') { over = { line: parseFloat(m[2]), odd: parseFloat(x.odd) }; }
+    else { under = { line: parseFloat(m[2]), odd: parseFloat(x.odd) }; }
+    if (over && under && over.line === under.line) {
+      const dist = Math.abs(over.line - targetLine);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = { line: over.line, over: over.odd, under: under.odd };
+      }
+    }
   }
-  if (line == null || over == null || under == null) return null;
-  return { bookmaker: zhBook(bm.name), line, over, under, open: true };
+  if (!best) return null;
+  return { bookmaker: zhBook(bookmakerName), ...best, open: true };
 }
 
 /* 某场比赛赔率 → 站点格式（无则返回 null） */
@@ -239,10 +308,12 @@ async function eventsFor(fixtureId, status) {
     } else if (t === 'Card') {
       if (d === 'Red Card' || d === 'Second Yellow card') { type = 'red'; detail = `红牌：${player}`; }
       else { type = 'yellow'; detail = `黄牌：${player}`; }
-    } else if (t === 'Subst') {
-      const on = (ev.assist && ev.assist.name) || '';
+    } else if (String(t).toLowerCase() === 'subst') {
+      // API-Football 中 player = 上场的球员，assist = 被换下的球员
+      const off = (ev.assist && ev.assist.name) || '';
+      const on = player;
       type = 'sub';
-      detail = on ? `换人：${player} → ${on}` : `换人：${player}`;
+      detail = off ? `换人：${off} → ${on}` : `换人：${on}`;
     } else {
       continue; // Var 等忽略
     }
@@ -276,7 +347,7 @@ async function syncApifootball(store) {
   if (overBudget()) { log('配额已满，跳过本轮'); return []; }
   try {
     const today = todayStr();
-    await attachFixtureIds(store, today);
+    await attachFixtureIds(store);
 
     // 今日比赛赔率（30 分钟缓存；直播中 5 分钟）
     for (const m of store.matches) {
