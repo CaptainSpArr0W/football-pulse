@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const { CODES, BIG_FIVE } = require('./data/competitions');
+const TEAM_NAMES_ZH = require('./data/team-names');
 
 const BASE = 'https://api.football-data.org/v4';
 const CONFIG_FILE = path.join(__dirname, 'data', 'api-config.json');
@@ -102,14 +103,28 @@ function roundOf(fx) {
 
 /* ---------- 球队对象 ---------- */
 
+/* 变音符号归一化：Vitória → vitoria，避免重音字符匹配失败 */
+const _norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+/* 预生成归一化后的中英对照表 */
+const TEAM_NAMES_ZH_NORM = {};
+for (const k of Object.keys(TEAM_NAMES_ZH)) TEAM_NAMES_ZH_NORM[_norm(k)] = TEAM_NAMES_ZH[k];
+
+/* 球队中文名：优先匹配短名，再匹配全名，未收录保留英文 */
+function zhTeamName(apiTeam) {
+  const s = _norm(apiTeam.shortName);
+  const n = _norm(apiTeam.name);
+  return TEAM_NAMES_ZH_NORM[s] || TEAM_NAMES_ZH_NORM[n] || null;
+}
+
 function teamObj(store, apiTeam, league) {
   const id = String(apiTeam.id);
   let t = store.teamIndex.get(id);
   if (!t) {
+    const zh = zhTeamName(apiTeam);
     t = {
       id,
-      name: apiTeam.name || id,
-      en: apiTeam.shortName || apiTeam.name || '',
+      name: zh || apiTeam.name || id,
+      en: apiTeam.name || apiTeam.shortName || '',
       short: apiTeam.tla || (apiTeam.shortName || '??').slice(0, 3).toUpperCase(),
       color: colorFor(id),
       color2: colorFor(id + 'x'),
@@ -272,7 +287,7 @@ async function fetchRecentFor(store, teamId) {
       const bj = bjOf(m.utcDate);
       return {
         date: bj.date.slice(5),
-        opponent: home ? m.awayTeam.name : m.homeTeam.name,
+        opponent: zhTeamName(home ? m.awayTeam : m.homeTeam) || (home ? m.awayTeam.name : m.homeTeam.name),
         home,
         gf: gf == null ? 0 : gf,
         ga: ga == null ? 0 : ga,
