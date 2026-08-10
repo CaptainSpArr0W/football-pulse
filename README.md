@@ -56,7 +56,26 @@ npm start       # 启动服务
    - 直播中比赛每 5 分钟同步事件流（进球 / 点球 / 红黄牌 / 换人），并随 WebSocket 实时推送；
    - 打开比赛详情页时按需补充赔率与事件（缓存命中不消耗配额）。
 
-免费档配额为 100 次/天，服务端做了预算管理：按需拉取 + 长缓存，超出安全阈值（90 次）自动暂停请求并在控制台提示，不影响站点其它功能。
+免费档配额为 100 次/天，服务端做了配额管理：按需拉取 + 长缓存，超出安全阈值（90 次）自动暂停请求并在控制台提示，不影响站点其它功能。
+
+### 配额按天重置
+
+配额按**北京时间自然日**统计，每日 0 点整点自动重置（并有惰性检查兜底，任何时刻状态一致），无需重启服务。重置与用量情况会输出到服务端控制台。
+
+### 用量告警邮件（可选）
+
+用量跨越 50% / 75% / 90% 以及配额耗尽时，会发送告警邮件（同一阈值每天只发一次，避免打扰）。配置方式：
+
+1. 复制 `server/data/notify-config.example.json` 为 `server/data/notify-config.json`，填入 SMTP 信息（QQ / 163 邮箱需开启 SMTP 并填写授权码；Gmail 需应用专用密码）：
+   ```json
+   {
+     "smtp": { "host": "smtp.qq.com", "port": 465, "secure": true, "user": "xxx@qq.com", "pass": "授权码" },
+     "from": "足球脉动 <xxx@qq.com>",
+     "to": ["接收告警的邮箱"]
+   }
+   ```
+2. 或使用环境变量：`NOTIFY_SMTP_HOST`、`NOTIFY_SMTP_PORT`、`NOTIFY_SMTP_USER`、`NOTIFY_SMTP_PASS`、`NOTIFY_FROM`、`NOTIFY_TO`。
+3. 未配置时仅输出控制台日志，不影响站点功能。
 
 ## 历史深度复盘（StatsBomb Open Data）
 
@@ -94,13 +113,15 @@ football-pulse/
 │   ├── index.js            # Express + WebSocket 入口
 │   ├── store.js            # 内存数据仓库（启动为空，由 fetcher 填充）
 │   ├── fetcher.js          # 真实数据同步层（football-data.org，含限流）
-│   ├── apifootball.js      # 赔率 + 事件流补充层（API-Football，含配额预算）
+│   ├── apifootball.js      # 赔率 + 事件流补充层（API-Football，含每日配额与告警）
+│   ├── notify.js           # 用量告警邮件（SMTP，可选）
 │   ├── statsbomb.js        # 历史复盘数据层（StatsBomb Open Data）
 │   └── data/
 │       ├── competitions.js # 可接入赛事配置（免费档开放的 13 项）
 │       ├── team-names.js   # 球队中英文名对照表（未收录保留英文）
 │       ├── api-config.example.json  # football-data API 配置模板
-│       └── apifootball-config.example.json # API-Football 配置模板
+│       ├── apifootball-config.example.json # API-Football 配置模板
+│       └── notify-config.example.json     # 邮件告警配置模板
 ├── public/
 │   ├── index.html          # 首页：赛程 + 实时比分
 │   ├── match.html          # 比赛详情页

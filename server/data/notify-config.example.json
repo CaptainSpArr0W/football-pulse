@@ -1,0 +1,11 @@
+{
+  "smtp": {
+    "host": "smtp.qq.com",
+    "port": 465,
+    "secure": true,
+    "user": "你的邮箱@qq.com",
+    "pass": "SMTP 授权码"
+  },
+  "from": "足球脉动 <你的邮箱@qq.com>",
+  "to": ["接收告警的邮箱@example.com"]
+}

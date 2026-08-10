@@ -28,31 +28,78 @@ function loadConfig() {
 const KEY = process.env.API_FOOTBALL_KEY || loadConfig().key || '';
 
 function log(msg) { console.log(`[apifootball] ${msg}`); }
+const notify = require('./notify');
 
-/* ---------- 每日预算 ---------- */
-const budget = { date: '', count: 0 };
-function todayStr() {
+/* ---------- 每日配额（按北京时间自然日重置，0 点整点重置 + 惰性兜底） ---------- */
+const THRESHOLDS = [50, 75, 90]; // 用量百分比告警阈值
+const budget = { date: '', count: 0, alerted: new Set() };
+
+function bjToday() {
   const d = new Date(Date.now() + 8 * 3600 * 1000);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 }
-function useBudget() {
-  const t = todayStr();
-  if (budget.date !== t) { budget.date = t; budget.count = 0; }
-  budget.count += 1;
-  if (budget.count % 10 === 0 || budget.count === SAFE_LIMIT) {
-    log(`今日 API 配额已用 ${budget.count}/${DAILY_LIMIT}`);
+
+/* 到达新的一天时重置配额（每次访问时检查，保证任何时刻状态一致） */
+function ensureDailyReset() {
+  const t = bjToday();
+  if (budget.date !== t) {
+    budget.date = t;
+    budget.count = 0;
+    budget.alerted.clear();
+    log(`配额已按天重置（${t}，上限 ${DAILY_LIMIT} 次/天）`);
   }
-  return budget.count;
 }
+
+/* 定时器：在北京时间午夜 0 点整点重置（与惰性检查双保险） */
+function scheduleMidnightReset() {
+  const bj = new Date(Date.now() + 8 * 3600 * 1000);
+  const msToMidnight = 24 * 3600 * 1000
+    - ((bj.getUTCHours() * 3600 + bj.getUTCMinutes() * 60 + bj.getUTCSeconds()) * 1000 + bj.getUTCMilliseconds());
+  setTimeout(() => {
+    ensureDailyReset();
+    scheduleMidnightReset();
+  }, msToMidnight + 1000);
+}
+scheduleMidnightReset();
+
+function useBudget() {
+  ensureDailyReset();
+  budget.count += 1;
+  const c = budget.count;
+  if (c % 10 === 0 || c === SAFE_LIMIT) log(`今日 API 配额已用 ${c}/${DAILY_LIMIT}`);
+  checkThresholds(c);
+  return c;
+}
+
 function overBudget() {
-  const t = todayStr();
-  if (budget.date !== t) { budget.date = t; budget.count = 0; }
+  ensureDailyReset();
   return budget.count >= SAFE_LIMIT;
 }
+
 function usage() {
-  const t = todayStr();
-  if (budget.date !== t) return 0;
+  ensureDailyReset();
   return budget.count;
+}
+
+/* 用量告警：跨越阈值（50/75/90%）与配额耗尽时发送邮件，当天每个阈值只发一次 */
+function checkThresholds(used) {
+  const pct = Math.round((used / DAILY_LIMIT) * 100);
+  const remain = Math.max(0, DAILY_LIMIT - used);
+  for (const t of THRESHOLDS) {
+    if (pct >= t && !budget.alerted.has(t)) {
+      budget.alerted.add(t);
+      notify.alert(`apifb-quota-${t}`,
+        `足球脉动 · API-Football 配额告警（${budget.date}）`,
+        `API-Football 免费档今日配额已用 ${used}/${DAILY_LIMIT}（${pct}%），剩余 ${remain} 次。\n` +
+        `超过 90 次后服务将暂停 API-Football 请求，实时比分仍由 football-data.org 支撑。`);
+    }
+  }
+  if (used >= DAILY_LIMIT && !budget.alerted.has(100)) {
+    budget.alerted.add(100);
+    notify.alert('apifb-quota-exhausted',
+      `足球脉动 · API-Football 配额已耗尽（${budget.date}）`,
+      `今日 ${DAILY_LIMIT} 次配额已全部用完，API-Football 请求已暂停，北京时间次日 0 点自动恢复。`);
+  }
 }
 
 /* ---------- 请求 + 缓存（含免费档限流：6 秒间隔 ≈ 10 次/分钟） ---------- */
@@ -346,7 +393,7 @@ async function syncApifootball(store) {
   if (!KEY) return [];
   if (overBudget()) { log('配额已满，跳过本轮'); return []; }
   try {
-    const today = todayStr();
+    const today = bjToday();
     await attachFixtureIds(store);
 
     // 今日比赛赔率（30 分钟缓存；直播中 5 分钟）
