@@ -103,17 +103,9 @@ function roundOf(fx) {
 
 /* ---------- 球队对象 ---------- */
 
-/* 变音符号归一化：Vitória → vitoria，避免重音字符匹配失败 */
-const _norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-/* 预生成归一化后的中英对照表 */
-const TEAM_NAMES_ZH_NORM = {};
-for (const k of Object.keys(TEAM_NAMES_ZH)) TEAM_NAMES_ZH_NORM[_norm(k)] = TEAM_NAMES_ZH[k];
-
 /* 球队中文名：优先匹配短名，再匹配全名，未收录保留英文 */
 function zhTeamName(apiTeam) {
-  const s = _norm(apiTeam.shortName);
-  const n = _norm(apiTeam.name);
-  return TEAM_NAMES_ZH_NORM[s] || TEAM_NAMES_ZH_NORM[n] || null;
+  return TEAM_NAMES_ZH.zhTeamName(apiTeam.name, apiTeam.shortName);
 }
 
 function teamObj(store, apiTeam, league) {

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>历史深度复盘 · 足球脉动</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="top-strip">
+      <div class="wrap top-strip-inner">
+        <span>已订阅人数：<b id="subCount">--</b></span>
+        <span>当前在线人数：<b id="onlineCount">--</b></span>
+      </div>
+    </div>
+    <div class="wrap header-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">
+          <strong>足球脉动</strong>
+          <em>FOOTBALL PULSE</em>
+        </span>
+      </a>
+      <nav class="top-nav" aria-label="主导航">
+        <a class="nav-link" href="/">实时赛程</a>
+        <a class="nav-link active" href="/review.html">历史复盘</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- 赛事/赛季选择 -->
+    <section class="page-head">
+      <h1>历史深度复盘</h1>
+      <p class="page-sub" id="pageSub">StatsBomb Open Data · 真实 XG / 射门分布 / 事件时间线 · 数据覆盖至 2023/24 赛季</p>
+      <div class="filter-bar">
+        <select class="comp-select" id="compSelect" aria-label="选择赛事"><option value="">选择赛事…</option></select>
+        <select class="comp-select" id="seasonSelect" aria-label="选择赛季"><option value="">选择赛季…</option></select>
+      </div>
+    </section>
+
+    <!-- 比赛列表 -->
+    <section class="matches-section">
+      <div class="section-title">
+        <h2 id="listTitle">比赛列表</h2>
+        <span class="section-note" id="listNote">选择赛事与赛季后展示，点击比赛查看深度复盘</span>
+      </div>
+      <div class="match-list" id="matchList"></div>
+      <div class="empty-state" id="emptyState">
+        <p>请先选择赛事与赛季</p>
+      </div>
+    </section>
+
+    <!-- 复盘面板 -->
+    <section class="review-panel" id="reviewPanel" hidden>
+
+      <div class="review-hero">
+        <div class="review-hero-top">
+          <span id="revComp" class="hero-comp">—</span>
+          <span id="revDate" class="match-time">—</span>
+        </div>
+        <div class="hero-teams">
+          <div class="hero-team">
+            <span class="crest-big" id="revHomeCrest">—</span>
+            <span class="hero-team-name" id="revHomeName">—</span>
+          </div>
+          <div class="hero-score" id="revScore">– : –</div>
+          <div class="hero-team">
+            <span class="crest-big" id="revAwayCrest">—</span>
+            <span class="hero-team-name" id="revAwayName">—</span>
+          </div>
+        </div>
+        <div class="hero-xg" id="revXg"></div>
+        <div class="review-source">数据来源：StatsBomb Open Data · 真实事件级数据</div>
+      </div>
+
+      <div class="review-grid">
+        <div>
+          <div class="section-title">
+            <h2>射门分布</h2>
+            <span class="section-note">圆点大小 = XG 值 · 实心圆 = 进球 · 主队攻右、客队攻左</span>
+          </div>
+          <svg id="shotMap" class="shot-map" viewBox="0 0 600 400" role="img" aria-label="射门分布图"></svg>
+        </div>
+        <div>
+          <div class="section-title">
+            <h2>数据统计</h2>
+            <span class="section-note">来自真实事件数据统计</span>
+          </div>
+          <div class="review-stats" id="revStats"></div>
+        </div>
+      </div>
+
+      <div class="section-title">
+        <h2>事件时间线</h2>
+        <span class="section-note">进球 / 红黄牌 / 换人</span>
+      </div>
+      <div class="events-card" id="revTimeline"></div>
+
+      <div class="section-title">
+        <h2>双方首发</h2>
+        <span class="section-note">真实比赛阵容</span>
+      </div>
+      <div class="lineup-compare" id="revLineups"></div>
+
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>足球脉动 Football Pulse · 历史复盘数据来自 StatsBomb Open Data（hudl/open-data），仅用于学习与展示</p>
+    </div>
+  </footer>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/review.js"></script>
+</body>
+</html>

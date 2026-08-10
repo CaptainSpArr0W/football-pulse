@@ -50,6 +50,40 @@ app.get('/api/match/:id', (req, res) => {
   res.json({ match: m });
 });
 
+/* ---------- StatsBomb 历史深度复盘 ---------- */
+const statsbomb = require('./statsbomb');
+
+/* 赛事/赛季列表（历史复盘选择器） */
+app.get('/api/statsbomb/competitions', async (req, res) => {
+  try {
+    res.json({ groups: await statsbomb.competitionGroups() });
+  } catch (err) {
+    res.status(502).json({ error: `StatsBomb 数据获取失败：${err.message}` });
+  }
+});
+
+/* 某赛事某赛季的比赛列表 */
+app.get('/api/statsbomb/matches', async (req, res) => {
+  const { comp, season } = req.query;
+  if (!comp || !season) return res.status(400).json({ error: '缺少 comp/season 参数' });
+  try {
+    res.json({ matches: await statsbomb.matchesFor(comp, season) });
+  } catch (err) {
+    res.status(502).json({ error: `StatsBomb 数据获取失败：${err.message}` });
+  }
+});
+
+/* 单场深度复盘（真实 XG / 射门 / 事件 / 统计 / 阵容） */
+app.get('/api/statsbomb/review', async (req, res) => {
+  const { comp, season, match } = req.query;
+  if (!comp || !season || !match) return res.status(400).json({ error: '缺少 comp/season/match 参数' });
+  try {
+    res.json({ review: await statsbomb.reviewFor(comp, season, match) });
+  } catch (err) {
+    res.status(502).json({ error: `复盘数据获取失败：${err.message}` });
+  }
+});
+
 /* ---------- HTTP 服务器 ---------- */
 const server = http.createServer(app);
 

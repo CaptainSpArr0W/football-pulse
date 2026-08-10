@@ -10,6 +10,7 @@
 | 实时比分 | 进行中的比赛实时推送比分与比赛分钟（WebSocket） |
 | 球队档案 | 点击任意球队名称进入详情页，查看首发阵容阵型图、近六场真实战绩与球队状态串（队名自动翻译为中文，英文名保留于详情页） |
 | 真实数据 | 全部来自 football-data.org v4：赛程、比分、状态、首发阵容、球队近六场 |
+| 历史复盘 | 独立入口「历史复盘」：StatsBomb Open Data 真实 XG、射门分布图、事件时间线、统计与首发阵容（覆盖至 2023/24 赛季） |
 | 数据同步 | 服务端定时拉取（默认 5 分钟），接口限流适配免费档 10 次/分钟 |
 | 订阅收藏 | 本地收藏比赛，订阅人数存于浏览器 localStorage |
 
@@ -40,6 +41,18 @@ npm start       # 启动服务
 
 免费档不提供的字段（赔率、XG、事件流、实时统计、舆论）对应区块会隐藏或显示「暂无数据」占位，不会出现模拟值。
 
+## 历史深度复盘（StatsBomb Open Data）
+
+顶部导航「历史复盘」入口，使用 [hudl/open-data](https://github.com/hudl/open-data)（StatsBomb 免费开放数据）提供历史比赛的深度分析：
+
+- **真实 XG**：逐射门统计的预期进球，双方对比条展示
+- **射门分布图**：球场坐标上的射门点，圆点大小 = XG，实心圆 = 进球，悬浮显示球员/结果
+- **事件时间线**：进球、红黄牌、换人
+- **数据统计**：控球率、射门、射正、犯规、牌数
+- **首发阵容**：真实比赛名单与位置
+
+覆盖赛事：五大联赛部分赛季、欧冠（多赛季）、世界杯（1970 起多届）、美洲杯 2024、非洲杯 2023、英女超等（最新约 2023/24 赛季）。数据为历史静态 JSON，按需从 `raw.githubusercontent.com` 拉取并缓存，无需密钥。
+
 ## 部署到 Render（免费，一键部署）
 
 仓库根目录已包含 `render.yaml` Blueprint 配置，部署步骤：
@@ -64,6 +77,7 @@ football-pulse/
 │   ├── index.js            # Express + WebSocket 入口
 │   ├── store.js            # 内存数据仓库（启动为空，由 fetcher 填充）
 │   ├── fetcher.js          # 真实数据同步层（football-data.org，含限流）
+│   ├── statsbomb.js        # 历史复盘数据层（StatsBomb Open Data）
 │   └── data/
 │       ├── competitions.js # 可接入赛事配置（免费档开放的 13 项）
 │       ├── team-names.js   # 球队中英文名对照表（未收录保留英文）
@@ -72,8 +86,9 @@ football-pulse/
 │   ├── index.html          # 首页：赛程 + 实时比分
 │   ├── match.html          # 比赛详情页
 │   ├── team.html           # 球队详情页
+│   ├── review.html         # 历史深度复盘页
 │   ├── css/style.css       # 设计系统
-│   └── js/                 # common / index / match / team 脚本
+│   └── js/                 # common / index / match / team / review 脚本
 └── validate.js             # 数据完整性自检（可选）
 ```
 

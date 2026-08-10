@@ -307,4 +307,15 @@ const ZH = {
   'russia': '俄罗斯', 'sbornaya': '俄罗斯',
 };
 
+/* 变音符号归一化 + 中英对照查询（供 fetcher / statsbomb 复用） */
+const _norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+const NORM = {};
+for (const k of Object.keys(ZH)) NORM[_norm(k)] = ZH[k];
+
+function zhTeamName(name, shortName) {
+  return NORM[_norm(shortName)] || NORM[_norm(name)] || null;
+}
+
 module.exports = ZH;
+module.exports.zhTeamName = zhTeamName;
+module.exports._norm = _norm;
