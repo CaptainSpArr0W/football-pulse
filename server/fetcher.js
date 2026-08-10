@@ -1,8 +1,9 @@
 /*
  * 真实数据同步层（fetcher）— football-data.org 版
- * - 从 football-data.org v4 拉取真实赛程 / 比分 / 状态
+ * - 从 football-data.org v4 拉取真实赛程 / 比分 / 状态 / 阵容 / 球队近况
+ * - 只保留 API 免费档实际开放的赛事，其余一律不展示
  * - 写入 store 内存，前端 /api 与 WebSocket 推送零改动
- * - 未配置 token、请求失败或超限时静默降级，保留本地模拟数据
+ * - 未配置 token、请求失败或超限时静默降级：站点保持空数据而非模拟数据
  *
  * Token 配置优先级（任选其一）：
  *   1. 环境变量 FOOTBALL_API_KEY
@@ -11,10 +12,12 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { CODES, BIG_FIVE } = require('./data/competitions');
 
 const BASE = 'https://api.football-data.org/v4';
-const MAP_FILE = path.join(__dirname, 'data', 'api-team-map.json');
 const CONFIG_FILE = path.join(__dirname, 'data', 'api-config.json');
+
+/* ---------- 配置 ---------- */
 
 function loadConfig() {
   try {
@@ -29,133 +32,158 @@ const CONFIG = loadConfig();
 const KEY = process.env.FOOTBALL_API_KEY || CONFIG.key || '';
 const INTERVAL_MS = Math.max(1, Number(process.env.SYNC_INTERVAL_MIN || CONFIG.intervalMin || 5)) * 60 * 1000;
 
-/* 已核实的 football-data.org 队ID（免费档覆盖的欧洲主流联赛） */
-const KNOWN_TEAM_IDS = {
-  ars: 57, liv: 64, mci: 65, mun: 66, che: 61, tot: 73,
-  rma: 86, bar: 81, atm: 78,
-  bay: 5, bvb: 4, rbl: 721,
-  int: 108, acm: 98, juv: 109,
-  psg: 524, monaco: 548,
-  benfica: 1903, porto: 503, sporting: 498,
-};
+const NAME_BY_CODE = CODES;
 
-/* v4 比赛状态 → 项目状态 */
-const STATUS_MAP = {
-  SCHEDULED: 'upcoming', TIMED: 'upcoming', POSTPONED: 'upcoming',
-  LIVE: 'live', IN_PLAY: 'live', PAUSED: 'live', SUSPENDED: 'live',
-  FINISHED: 'finished', CANCELLED: 'finished', AWARDED: 'finished',
-};
+/* ---------- 工具 ---------- */
 
+function pad(n) { return String(n).padStart(2, '0'); }
+
+/* 北京时区（UTC+8，无夏令时）的今天日期 */
 function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const d = new Date(Date.now() + 8 * 3600 * 1000);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 }
 
-function log(msg) {
-  console.log(`[fetcher] ${msg}`);
+/* UTC ISO 时间 → 北京时间日期 + HH:mm */
+function bjOf(utcDate) {
+  const d = new Date(Date.parse(utcDate) + 8 * 3600 * 1000);
+  return {
+    date: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`,
+    time: `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`,
+  };
+}
+
+/* 队徽缺失时的兜底配色（由球队 id 确定性生成） */
+const PALETTE = ['#5c6bc0', '#ef5350', '#26a69a', '#ffa726', '#ab47bc', '#26c6da', '#66bb6a', '#ff7043', '#7e57c2', '#29b6f6', '#d4e157', '#f06292'];
+function colorFor(id) {
+  let h = 0;
+  for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) % 9973;
+  return PALETTE[h % PALETTE.length];
+}
+
+function log(msg) { console.log(`[fetcher] ${msg}`); }
+
+/* 限流队列：免费档 10 次/分钟，这里留 6 秒间隔余量 */
+let lastCallAt = 0;
+async function throttled(fn) {
+  const wait = Math.max(0, 6000 - (Date.now() - lastCallAt));
+  if (wait) await new Promise((r) => setTimeout(r, wait));
+  lastCallAt = Date.now();
+  return fn();
 }
 
 async function api(pathname) {
-  const res = await fetch(BASE + pathname, { headers: { 'X-Auth-Token': KEY } });
-  if (!res.ok) {
-    const msg = res.status === 429 ? '请求超限(429)，稍后自动重试' : `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return res.json();
-}
-
-/* ---------- 队ID映射（KNOWN + 用户可手补的本地文件） ---------- */
-
-function loadMap() {
-  try {
-    let raw = fs.readFileSync(MAP_FILE, 'utf8');
-    if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
-    return JSON.parse(raw);
-  } catch (_) {
-    return {};
-  }
-}
-
-/* ---------- 同步真实数据到 store ---------- */
-
-function buildMatchIndex(store, apiMap) {
-  const index = new Map(); // `${apiHome}|${apiAway}` -> match
-  for (const m of store.matches) {
-    const ah = apiMap[m.home.id];
-    const aa = apiMap[m.away.id];
-    if (ah && aa) index.set(`${ah}|${aa}`, m);
-  }
-  return index;
-}
-
-function applyFixture(match, fx) {
-  if (match.status === 'live') return false; // 不覆盖模拟直播中的场次
-  const status = STATUS_MAP[fx.status] || match.status;
-  const ft = fx.score && fx.score.fullTime;
-  const score = {
-    home: ft && ft.home != null ? ft.home : match.score.home,
-    away: ft && ft.away != null ? ft.away : match.score.away,
-  };
-  const changed =
-    status !== match.status ||
-    score.home !== match.score.home ||
-    score.away !== match.score.away ||
-    (status === 'live' && fx.minute != null && fx.minute !== match.minute);
-  if (!changed) return false;
-
-  match.status = status;
-  if (fx.minute != null) match.minute = fx.minute;
-  match.score = score;
-  return true;
-}
-
-function pushUpdate(store, match) {
-  store.broadcast({
-    type: 'live-update',
-    matchId: match.id,
-    minute: match.minute,
-    half: match.minute <= 45 ? '上半场' : '下半场',
-    status: match.status,
-    score: match.score,
-    xg: match.xg,
-    stats: match.stats || null,
-    events: match.events.slice(-6),
-    homeTeam: match.home.id,
-    awayTeam: match.away.id,
+  return throttled(async () => {
+    const res = await fetch(BASE + pathname, { headers: { 'X-Auth-Token': KEY } });
+    if (res.status === 429) throw new Error('请求超限(429)，稍后自动重试');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
   });
 }
 
-/* 已完场：把真实赛果回填到主客两队近六场（recent）与状态串（form） */
-function backfillRecent(match, fx) {
-  if (match._backfilled) return;
-  const score = match.score;
-  const date = todayStr().slice(5); // 'MM-DD'，与现有 recent 格式一致
-  const estXg = (gf, ga) => ({ xg: +(0.4 + gf * 0.75).toFixed(2), xga: +(0.4 + ga * 0.75).toFixed(2) });
-
-  const buildEntry = (self, opponent, home) => {
-    const gf = home ? score.home : score.away;
-    const ga = home ? score.away : score.home;
-    return {
-      date,
-      opponent,
-      home,
-      gf, ga,
-      ...estXg(gf, ga),
-      result: gf > ga ? 'W' : gf < ga ? 'L' : 'D',
-      comp: match.competition,
-    };
-  };
-
-  const homeRecent = [buildEntry(match.home, match.away.name, true), ...(match.home.recent || [])].slice(0, 6);
-  const awayRecent = [buildEntry(match.away, match.home.name, false), ...(match.away.recent || [])].slice(0, 6);
-  match.home.recent = homeRecent;
-  match.away.recent = awayRecent;
-  if (match.home.form) match.home.form = homeRecent.map((r) => r.result).join('');
-  if (match.away.form) match.away.form = awayRecent.map((r) => r.result).join('');
-  match._backfilled = true;
+/* v4 比赛状态 → 项目状态 */
+function statusOf(s) {
+  switch (s) {
+    case 'LIVE': case 'IN_PLAY': case 'PAUSED': case 'SUSPENDED':
+      return 'live';
+    case 'FINISHED': case 'AWARDED':
+      return 'finished';
+    default:
+      return 'upcoming'; // SCHEDULED / TIMED / POSTPONED / CANCELLED
+  }
 }
 
-/* ---------- 真实阵容（lineup）同步 ---------- */
+function roundOf(fx) {
+  if (fx.matchday) return `第${fx.matchday}轮`;
+  if (fx.group) return fx.group.replace(/_/g, ' ');
+  if (fx.stage && fx.stage !== 'REGULAR_SEASON') return fx.stage.replace(/_/g, ' ').toLowerCase();
+  return '';
+}
+
+/* ---------- 球队对象 ---------- */
+
+function teamObj(store, apiTeam, league) {
+  const id = String(apiTeam.id);
+  let t = store.teamIndex.get(id);
+  if (!t) {
+    t = {
+      id,
+      name: apiTeam.name || id,
+      en: apiTeam.shortName || apiTeam.name || '',
+      short: apiTeam.tla || (apiTeam.shortName || '??').slice(0, 3).toUpperCase(),
+      color: colorFor(id),
+      color2: colorFor(id + 'x'),
+      crest: apiTeam.crest || null,
+      league,
+      formation: '',
+      lineup: null,
+      recent: [],
+      form: '',
+      _recentFetchedAt: 0,
+      _lineupFetched: false,
+    };
+    store.upsertTeam(t);
+  }
+  return t;
+}
+
+/* ---------- 比赛对象 ---------- */
+
+function buildMatch(store, fx) {
+  const cn = NAME_BY_CODE[fx.competition.code];
+  if (!cn) return null;
+  const bj = bjOf(fx.utcDate);
+  const status = statusOf(fx.status);
+  const home = teamObj(store, fx.homeTeam, cn);
+  const away = teamObj(store, fx.awayTeam, cn);
+
+  const sc = fx.score || {};
+  const pick = (o) => (o && o.home != null ? { home: o.home, away: o.away } : null);
+  const score = pick(sc.fullTime) || pick(sc.regularTime) || pick(sc.halfTime)
+    || (status === 'live' ? { home: 0, away: 0 } : (status === 'finished' ? { home: 0, away: 0 } : { home: 0, away: 0 }));
+
+  return {
+    id: `f-${fx.id}`,
+    apiId: fx.id,
+    date: bj.date,
+    competition: cn,
+    round: roundOf(fx),
+    home: { id: home.id },
+    away: { id: away.id },
+    kickoff: bj.time,
+    kickoffTs: Date.parse(fx.utcDate),
+    status,
+    minute: fx.minute != null ? fx.minute : null,
+    score,
+    xg: { home: 0, away: 0 },
+    stats: null,
+    events: [],
+    odds: { europe: [], asian: [], total: [], corners: [] },
+    halfReport: null,
+    _lineupFetched: false,
+  };
+}
+
+/* 写入 store，返回发生变化的比赛（新建或状态/比分/分钟变化） */
+function applyToStore(store, fx) {
+  const m = buildMatch(store, fx);
+  if (!m) return null;
+  const existing = store.matchIndex.get(m.apiId);
+  if (existing) {
+    const changed =
+      existing.status !== m.status ||
+      existing.score.home !== m.score.home ||
+      existing.score.away !== m.score.away ||
+      existing.minute !== m.minute ||
+      existing.kickoffTs !== m.kickoffTs;
+    const up = store.upsertMatch(m);
+    return changed ? up : null;
+  }
+  store.upsertMatch(m);
+  return m;
+}
+
+/* ---------- 阵容同步 ---------- */
 
 /* 阵型模板：每个槽位 [角色, x, y]，坐标沿用项目 pos 体系 */
 const LINEUP_TEMPLATES = {
@@ -193,7 +221,6 @@ function buildLineupFromApi(startingXI, formation) {
     const need = bucketForRole(role);
     let p = buckets[need].shift();
     if (!p) {
-      // 该线人数不足时按 FW → MF → DF → GK 顺序从相邻线补位
       for (const fallback of ['FW', 'MF', 'DF', 'GK']) {
         if (fallback === need) continue;
         p = buckets[fallback].shift();
@@ -206,69 +233,130 @@ function buildLineupFromApi(startingXI, formation) {
   return lineup.length === 11 ? lineup : null;
 }
 
-async function fetchLineups(store, match, fx) {
+async function fetchLineupsFor(store, m) {
+  if (m._lineupFetched) return;
   try {
-    const lu = await api(`/matches/${fx.id}/lineups`);
-    if (lu && lu.home && Array.isArray(lu.home.startingXI) && lu.home.startingXI.length) {
-      const homeLineup = buildLineupFromApi(lu.home.startingXI, lu.home.formation || match.home.formation);
-      const awayLineup = buildLineupFromApi(lu.away && lu.away.startingXI, lu.away && lu.away.formation || match.away.formation);
-      if (homeLineup) match.home.lineup = homeLineup;
-      if (awayLineup) match.away.lineup = awayLineup;
-      log(`阵容同步：${match.id} ${match.home.name} vs ${match.away.name}`);
-      match._lineupFetched = true;
+    const lu = await api(`/matches/${m.apiId}/lineups`);
+    const build = (side) => (side && Array.isArray(side.startingXI) && side.startingXI.length
+      ? buildLineupFromApi(side.startingXI, side.formation)
+      : null);
+    const homeLu = build(lu.home);
+    const awayLu = build(lu.away);
+    if (homeLu || awayLu) {
+      const ht = store.teamIndex.get(m.home.id);
+      const at = store.teamIndex.get(m.away.id);
+      if (ht && homeLu) { ht.lineup = homeLu; ht.formation = lu.home.formation || ht.formation; }
+      if (at && awayLu) { at.lineup = awayLu; at.formation = (lu.away && lu.away.formation) || at.formation; }
+      log(`阵容同步：${m.id} ${ht && ht.name} vs ${at && at.name}`);
     }
+    m._lineupFetched = true;
   } catch (err) {
-    // 403 表示免费档未开放该场阵容，本场不再重试；429 限流保留下次重试
-    if (!String(err.message).includes('429')) match._lineupFetched = true;
+    // 403/404 表示免费档未开放该场阵容，本场不再重试；429 限流保留下次重试
+    if (!String(err.message).includes('429')) m._lineupFetched = true;
   }
+}
+
+/* ---------- 球队近况同步 ---------- */
+
+async function fetchRecentFor(store, teamId) {
+  const t = store.teamIndex.get(teamId);
+  if (!t) return;
+  try {
+    const j = await api(`/teams/${teamId}/matches?status=FINISHED&limit=5`);
+    const list = (j.matches || []).slice(0, 5);
+    t.recent = list.map((m) => {
+      const home = String(m.homeTeam.id) === teamId;
+      const ft = (m.score && m.score.fullTime) || {};
+      const gf = home ? ft.home : ft.away;
+      const ga = home ? ft.away : ft.home;
+      const bj = bjOf(m.utcDate);
+      return {
+        date: bj.date.slice(5),
+        opponent: home ? m.awayTeam.name : m.homeTeam.name,
+        home,
+        gf: gf == null ? 0 : gf,
+        ga: ga == null ? 0 : ga,
+        result: gf == null || ga == null ? 'D' : gf > ga ? 'W' : gf < ga ? 'L' : 'D',
+        comp: NAME_BY_CODE[m.competition.code] || m.competition.name,
+      };
+    });
+    t.form = t.recent.map((r) => r.result).join('');
+    t._recentFetchedAt = Date.now();
+  } catch (err) {
+    log(`球队近况失败 ${teamId}：${err.message}`);
+  }
+}
+
+/* ---------- 推送 ---------- */
+
+function pushUpdate(store, match) {
+  store.broadcast({
+    type: 'live-update',
+    matchId: match.id,
+    minute: match.minute,
+    half: '',
+    status: match.status,
+    score: match.score,
+    xg: match.xg || { home: 0, away: 0 },
+    stats: null,
+    events: [],
+    homeTeam: match.home.id,
+    awayTeam: match.away.id,
+  });
 }
 
 /* ---------- 主循环 ---------- */
 
-let timer = null;
-
 async function syncOnce(store) {
   if (!KEY) return { ok: false, reason: 'no-key' };
   try {
-    const apiMap = { ...KNOWN_TEAM_IDS, ...loadMap() };
-    const index = buildMatchIndex(store, apiMap);
-    if (!index.size) return { ok: false, reason: 'no-mapped-teams' };
-
-    const [liveJson, todayJson] = await Promise.all([
-      api('/matches?status=LIVE'),
-      api(`/matches?date=${todayStr()}`),
-    ]);
-
-    const fixtures = [...(liveJson.matches || []), ...(todayJson.matches || [])];
-    const seen = new Set();
-    let updated = 0;
-
+    const off = (n) => {
+      const d = new Date(Date.now() + 8 * 3600 * 1000);
+      d.setUTCDate(d.getUTCDate() + n);
+      return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+    };
+    const j = await api(`/matches?dateFrom=${off(-1)}&dateTo=${off(1)}`);
+    const fixtures = j.matches || [];
+    const changed = [];
     for (const fx of fixtures) {
-      const key = `${fx.homeTeam.id}|${fx.awayTeam.id}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const match = index.get(key);
-      if (!match) continue;
-      if (applyFixture(match, fx)) {
-        updated++;
-        if (match.status === 'finished') backfillRecent(match, fx);
-        pushUpdate(store, match);
-      }
-      if (!match._lineupFetched && (match.status === 'live' || match.status === 'finished')) {
-        await fetchLineups(store, match, fx);
+      const m = applyToStore(store, fx);
+      if (m) changed.push(m);
+    }
+
+    // 直播/已完场：同步首发阵容（每场一次，限流）
+    for (const m of store.matches) {
+      if ((m.status === 'live' || m.status === 'finished') && !m._lineupFetched) {
+        await fetchLineupsFor(store, m);
       }
     }
-    log(`同步完成：命中 ${seen.size} 场，更新 ${updated} 场（映射 ${index.size} 组）`);
-    return { ok: true, updated };
+
+    // 窗口内涉及球队：同步近六场（每轮最多 10 支，30 分钟缓存，多轮循环覆盖全部）
+    const involved = new Set();
+    for (const m of store.matches) { involved.add(m.home.id); involved.add(m.away.id); }
+    let n = 0;
+    for (const tid of involved) {
+      const t = store.teamIndex.get(tid);
+      if (t && (!t._recentFetchedAt || Date.now() - t._recentFetchedAt > 30 * 60 * 1000) && n < 10) {
+        await fetchRecentFor(store, tid);
+        n++;
+      }
+    }
+
+    for (const m of changed) pushUpdate(store, m);
+    store.broadcast({ type: 'data-refreshed', at: Date.now(), matches: store.matches.length });
+    log(`同步完成：接口 ${fixtures.length} 场，更新 ${changed.length} 场，球队 ${store.teamIndex.size} 支`);
+    return { ok: true, updated: changed.length };
   } catch (err) {
-    log(`同步失败，降级为模拟数据：${err.message}`);
+    log(`同步失败，保持现有数据：${err.message}`);
     return { ok: false, reason: err.message };
   }
 }
 
+let timer = null;
+
 function start(store) {
   if (!KEY) {
-    log('未配置 football-data token，跳过真实数据（保持模拟模式）。');
+    log('未配置 football-data token，站点将保持空数据。');
     log('设置环境变量 FOOTBALL_API_KEY 或写入 server/data/api-config.json 后重启即可启用。');
     return;
   }
@@ -283,4 +371,4 @@ function stop() {
   timer = null;
 }
 
-module.exports = { start, stop, syncOnce, todayStr, KNOWN_TEAM_IDS };
+module.exports = { start, stop, syncOnce, todayStr, CODES, BIG_FIVE };

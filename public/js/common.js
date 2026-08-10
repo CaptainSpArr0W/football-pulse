@@ -121,6 +121,10 @@ function cornersTable(match) {
 }
 
 function oddsTable(match) {
+  const od = match.odds || {};
+  const hasOdds = (od.europe && od.europe.length) || (od.asian && od.asian.length)
+    || (od.total && od.total.length) || (od.corners && od.corners.length);
+  if (!hasOdds) return ''; // 无真实赔率数据时不渲染赔率区
   return `<div class="odds-wrap" data-odds>
     <div class="odds-tabs">
       <button class="odds-tab active" data-tab="europe">欧赔</button>

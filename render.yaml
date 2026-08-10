@@ -13,7 +13,7 @@ services:
       # 服务器时区设为北京时区，保证「今天」的比赛日期与国内用户一致
       - key: TZ
         value: Asia/Shanghai
-      # football-data.org API Key（可选，留空则运行演示数据模式）
-      # 部署时 Render 会提示你填写，不填也能正常启动
+      # football-data.org API Key（必填，未配置则站点为空数据）
+      # 部署时 Render 会提示你填写
       - key: FOOTBALL_API_KEY
         sync: false

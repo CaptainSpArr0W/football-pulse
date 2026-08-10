@@ -1,4 +1,4 @@
-/* 首页：赛事一览 + 赔率 + 实时 XG */
+/* 首页：真实赛事一览 + 实时比分（数据来自 football-data.org） */
 (function () {
   const BIG_FIVE = ['英超', '西甲', '德甲', '意甲', '法甲'];
 
@@ -11,6 +11,12 @@
   const $ = (sel) => document.querySelector(sel);
 
   /* ---------- 日期工具 ---------- */
+  function shiftDate(dateStr, n) {
+    const d = new Date(dateStr + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    const p = (x) => String(x).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}`;
+  }
   function weekdayOf(dateStr) {
     return new Date(dateStr + 'T12:00:00').toLocaleDateString('zh-CN', { weekday: 'long' });
   }
@@ -22,20 +28,21 @@
   /* ---------- 渲染日期导航（昨天/今天/明天 + 更多日期下拉） ---------- */
   function renderDateNav() {
     const nav = $('#dateNav');
-    const dates = state.overview.dates;
-    const todayIdx = dates.indexOf(state.overview.today);
-    const labels = ['昨天', '今天', '明天'];
+    const today = state.overview.today;
+    const dates = state.overview.dates || [];
 
     nav.innerHTML = [-1, 0, 1]
       .map((off) => {
-        const d = dates[todayIdx + off];
-        if (!d) return '';
+        const d = shiftDate(today, off);
         const isActive = state.selectedDate === d;
-        return `<button class="date-btn${isActive ? ' is-today' : ''}" data-date="${d}">${labels[off + 1]}</button>`;
+        const hasMatch = dates.includes(d);
+        return `<button class="date-btn${isActive ? ' is-today' : ''}" data-date="${d}" ${hasMatch ? '' : 'disabled'}>
+          ${['昨天', '今天', '明天'][off + 1]}
+        </button>`;
       })
       .join('') + '<select class="date-select" id="dateSelect" aria-label="选择其他日期"></select>';
 
-    const others = dates.filter((_, i) => ![-1, 0, 1].includes(i - todayIdx));
+    const others = dates.filter((d) => ![-1, 0, 1].includes((new Date(d) - new Date(today)) / 86400000));
     const sel = nav.querySelector('#dateSelect');
     sel.innerHTML = '<option value="">更多日期</option>' +
       others.map((d) => `<option value="${d}"${state.selectedDate === d ? ' selected' : ''}>${monthDay(d)} ${weekdayOf(d)}</option>`).join('');
@@ -64,7 +71,6 @@
       .join('');
     wrap.querySelectorAll('.filter-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
-        // 点击已选中的联赛取消选择，回到五大联赛全部
         state.selectedComp = state.selectedComp === chip.dataset.comp ? null : chip.dataset.comp;
         syncSelect();
         renderFilters();
@@ -76,7 +82,7 @@
 
   function renderSelect() {
     const sel = $('#compSelect');
-    const others = state.overview.competitions.filter((c) => !BIG_FIVE.includes(c));
+    const others = (state.overview.competitions || []).filter((c) => !BIG_FIVE.includes(c));
     sel.innerHTML = '<option value="">更多联赛</option>' +
       others.map((c) => `<option value="${esc(c)}"${state.selectedComp === c ? ' selected' : ''}>${esc(c)}</option>`).join('');
     sel.onchange = () => {
@@ -88,14 +94,12 @@
     };
   }
 
-  /* 选中其他联赛时，取消五大联赛标签高亮 */
   function syncFilters() {
     $('#compFilters').querySelectorAll('.filter-chip').forEach((chip) => {
       chip.classList.toggle('active', chip.dataset.comp === state.selectedComp);
     });
   }
 
-  /* 选中五大联赛标签时，下拉回到占位 */
   function syncSelect() {
     const sel = $('#compSelect');
     if (BIG_FIVE.includes(state.selectedComp)) sel.value = '';
@@ -106,8 +110,9 @@
     const isToday = state.selectedDate === state.overview.today;
     const titleComp = state.selectedComp ? `${state.selectedComp} · ` : '五大联赛 · ';
     $('#pageTitle').textContent = isToday ? `${titleComp}今日赛程` : `${titleComp}${monthDay(state.selectedDate)} ${weekdayOf(state.selectedDate)}`;
-    $('#pageSub').textContent = `赛程覆盖过去3天至未来7天 · 共 ${visibleMatches().length} 场比赛 · 赔率数据实时更新`;
-    $('#listNote').textContent = '点击球队名称查看阵容、近况与舆论分析';
+    const total = (state.overview.byDate[state.selectedDate] || []).length;
+    $('#pageSub').textContent = `数据来源 football-data.org · 当日共 ${total} 场比赛`;
+    $('#listNote').textContent = '点击球队名称查看阵容与近期战绩';
   }
 
   function visibleMatches() {
@@ -118,12 +123,16 @@
 
   /* ---------- 比赛列表渲染 ---------- */
   function renderMatchList() {
-    const list = visibleMatches().filter(
-      (m) => state.selectedComp === '全部' || m.competition === state.selectedComp,
-    );
+    const list = visibleMatches();
     const wrap = $('#matchList');
     wrap.innerHTML = list.map((m, i) => matchCard(m, i)).join('');
-    $('#emptyState').hidden = list.length > 0;
+    const empty = $('#emptyState');
+    empty.hidden = list.length > 0;
+    empty.innerHTML = list.length
+      ? ''
+      : `<p>${(state.overview.dates || []).length === 0
+        ? '暂无比赛数据：请确认已配置 football-data.org API 密钥，或当前时间段该赛事未进行'
+        : '该日期暂无赛事安排'}</p>`;
   }
 
   /* ---------- 直播区（跟随当前联赛筛选） ---------- */
@@ -133,48 +142,11 @@
       .filter((m) => !state.selectedComp || m.competition === state.selectedComp);
   }
 
-  function eventHtml(ev) {
-    const badge = ev.type === 'goal'
-      ? `<span class="event-score-badge">${ev.homeScore}-${ev.awayScore}</span>`
-      : '';
-    const tag = ev.type === 'goal'
-      ? '<span class="event-card goal">进球</span>'
-      : ev.type === 'penalty'
-        ? '<span class="event-card penalty">点球</span>'
-        : ev.type === 'own-goal'
-          ? '<span class="event-card own-goal">乌龙</span>'
-          : ev.type === 'yellow'
-            ? '<span class="event-card yellow">黄牌</span>'
-            : ev.type === 'red'
-              ? '<span class="event-card red">红牌</span>'
-              : ev.type === 'corner'
-                ? '<span class="event-card corner">角球</span>'
-                : ev.type === 'sub'
-                  ? '<span class="event-card sub">换人</span>'
-                  : '';
-    return `<div class="event-item${ev.type === 'goal' ? ' event-type-goal' : ''}">
-      <span class="event-min">${ev.minute}&#39;</span>
-      <span class="event-detail">${tag}${esc(ev.detail)}${badge}</span>
-    </div>`;
-  }
-
-  function reportInner(r) {
-    const s = r.stats;
-    return `<div class="live-report-head">⚽ 中场战报</div>
-      <p class="live-report-text">${esc(r.text)}</p>
-      <div class="live-report-stats">XG ${r.xg.home.toFixed(2)}-${r.xg.away.toFixed(2)} · 射门 ${s.shots.home}-${s.shots.away} · 角球 ${s.corners.home}-${s.corners.away} · 黄牌 ${s.yellowCards.home}-${s.yellowCards.away}</div>`;
-  }
-
   function liveCard(match) {
-    const total = match.xg.home + match.xg.away || 1;
-    const wHome = (match.xg.home / total) * 100;
-    const wAway = (match.xg.away / total) * 100;
-    const events = [...match.events].reverse().map(eventHtml).join('');
-
     return `<div class="live-card" id="live-${match.id}" data-match="${match.id}">
       <div class="live-card-top">
         <span class="live-competition">${esc(match.competition)} · ${esc(match.round)}</span>
-        <span class="live-minute" data-role="minute">${match.minute}&#39;</span>
+        <span class="live-minute" data-role="minute">${match.minute != null ? match.minute + '&#39;' : '进行中'}</span>
       </div>
       <div class="live-teams">
         <div class="live-team">
@@ -191,26 +163,8 @@
           ${crestHtml(match.away, 38)}
         </div>
       </div>
-      <div class="live-xg">
-        <div class="xg-row">
-          <span class="xg-tag home-tag" data-role="xgh">${match.xg.home.toFixed(2)}</span>
-          <div class="xg-track">
-            <div class="xg-bar home" data-role="barh" style="width:${wHome.toFixed(1)}%"></div>
-            <div class="xg-bar away" data-role="bara" style="width:${wAway.toFixed(1)}%"></div>
-            <div class="xg-divider"></div>
-          </div>
-          <span class="xg-tag away-tag" data-role="xga">${match.xg.away.toFixed(2)}</span>
-        </div>
-      </div>
-      <div class="live-report" id="report-${match.id}" data-role="report"${match.halfReport ? '' : ' hidden'}>
-        ${match.halfReport ? reportInner(match.halfReport) : ''}
-      </div>
-      <div class="live-events">
-        <div class="live-events-title">关键事件</div>
-        <div data-role="events">${events || '<div class="event-item"><span class="event-detail" style="color:var(--ink-3)">比赛即将开始</span></div>'}</div>
-      </div>
       <div class="live-enter-row">
-        <a class="live-enter" href="/match.html?match=${match.id}">查看实时数据 →</a>
+        <a class="live-enter" href="/match.html?match=${match.id}">查看比赛详情 →</a>
       </div>
     </div>`;
   }
@@ -236,17 +190,6 @@
       if (as && Number(as.textContent) !== data.score.away) flash(as);
       if (hs) hs.textContent = data.score.home;
       if (as) as.textContent = data.score.away;
-
-      const total = data.xg.home + data.xg.away || 1;
-      const bh = card.querySelector('[data-role="barh"]');
-      const ba = card.querySelector('[data-role="bara"]');
-      if (bh) bh.style.width = `${((data.xg.home / total) * 100).toFixed(1)}%`;
-      if (ba) ba.style.width = `${((data.xg.away / total) * 100).toFixed(1)}%`;
-      card.querySelector('[data-role="xgh"]').textContent = data.xg.home.toFixed(2);
-      card.querySelector('[data-role="xga"]').textContent = data.xg.away.toFixed(2);
-      if (data.events && data.events.length) {
-        card.querySelector('[data-role="events"]').innerHTML = [...data.events].reverse().map(eventHtml).join('');
-      }
     }
 
     /* 同步更新比赛列表中的该场比分 */
@@ -272,13 +215,16 @@
     setTimeout(() => el.classList.remove('score-flash'), 750);
   }
 
-  /* ---------- 首页直播卡：中场战报 ---------- */
-  function showLiveReport(matchId, report) {
-    const box = document.getElementById(`report-${matchId}`);
-    if (box) {
-      box.hidden = false;
-      box.innerHTML = reportInner(report);
-    }
+  /* ---------- 数据刷新（fetcher 同步完成后） ---------- */
+  async function refetchOverview() {
+    try {
+      const res = await fetch('/api/overview');
+      const ov = await res.json();
+      const prevDate = state.selectedDate;
+      state.overview = ov;
+      state.selectedDate = (ov.dates || []).includes(prevDate) ? prevDate : ov.today;
+      render();
+    } catch (_) { /* 保留当前视图 */ }
   }
 
   /* ---------- 初始化 ---------- */
@@ -296,7 +242,7 @@
     renderSelect();
     render();
     connectWS((data) => {
-      if (data.type === 'half-time-report') { showLiveReport(data.matchId, data.report); return; }
+      if (data.type === 'data-refreshed') { refetchOverview(); return; }
       applyLiveUpdate(data);
     });
   }

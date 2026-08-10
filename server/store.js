@@ -1,41 +1,47 @@
 /*
- * 内存数据仓库：赛事查询、球队查询、WebSocket 客户端广播
+ * 内存数据仓库（真实数据模式）
+ * - 启动时为空，由 fetcher 从 football-data.org 实时填充比赛与球队
+ * - 提供赛事查询、球队查询、WebSocket 客户端广播
  */
-const { buildMatches } = require('./data/matches');
-const { TEAMS, teamMap } = require('./data/teams');
-const { XgEngine } = require('./xgEngine');
+const { BIG_FIVE } = require('./data/competitions');
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+/* 北京时区（UTC+8）的今天日期 */
+function todayStr() {
+  const d = new Date(Date.now() + 8 * 3600 * 1000);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
 
 class Store {
   constructor() {
-    const { today, all } = buildMatches();
-    this.today = today;
-    this.matches = all;
+    this.matches = [];            // 真实比赛列表
+    this.teamIndex = new Map();   // 球队 id -> 球队对象（含 lineup / recent / form）
+    this.matchIndex = new Map();  // apiId -> match
     this.clients = new Set();
-    this.engine = new XgEngine({
-      broadcast: (payload) => this.broadcast(payload),
-      onFinished: (match) => this._restartLive(match),
-    });
-    this.booted = false;
   }
 
-  /* 演示模式：终场后重置比赛并重新开赛，保持页面始终有实时直播 */
-  _restartLive(match) {
-    match.score = { home: 0, away: 0 };
-    match.xg = { home: 0, away: 0 };
-    match.events = [];
-    match.minute = 0;
-    match.halfReport = null;
-    this.engine.start(match);
-  }
+  get today() { return todayStr(); }
 
-  /* 启动时初始化进行中的比赛 */
-  boot() {
-    if (this.booted) return;
-    this.booted = true;
-    for (const m of this.matches) {
-      if (m.status === 'live') this.engine.start(m);
+  /* ---------- 由 fetcher 写入 ---------- */
+
+  upsertMatch(m) {
+    const existing = this.matchIndex.get(m.apiId);
+    if (existing) {
+      for (const k of Object.keys(m)) existing[k] = m[k];
+      return existing;
     }
+    this.matches.push(m);
+    this.matchIndex.set(m.apiId, m);
+    return m;
   }
+
+  upsertTeam(t) {
+    this.teamIndex.set(t.id, t);
+    return t;
+  }
+
+  /* ---------- 查询 ---------- */
 
   matchesByDate(date) {
     return this.matches
@@ -51,22 +57,10 @@ class Store {
     return [...new Set(this.matches.map((m) => m.competition))];
   }
 
-  team(id) {
-    const team = teamMap.get(id);
-    if (!team) return null;
-    const upcoming = this.matches.filter(
-      (m) =>
-        (m.home.id === id || m.away.id === id) &&
-        (m.status === 'live' || m.status === 'upcoming'),
-    );
-    return { ...team, matches: upcoming.map((m) => this._publicMatch(m)) };
-  }
-
-  teams() {
-    return TEAMS.map((t) => ({
-      id: t.id, name: t.name, en: t.en, short: t.short,
-      color: t.color, color2: t.color2, league: t.league, form: t.form,
-    }));
+  _teamView(id) {
+    const t = this.teamIndex.get(id);
+    if (t) return { id: t.id, name: t.name, short: t.short, color: t.color, color2: t.color2, crest: t.crest };
+    return { id, name: id, short: id.slice(0, 3).toUpperCase(), color: '#5c6bc0', color2: '#3949ab', crest: null };
   }
 
   _publicMatch(m) {
@@ -75,44 +69,70 @@ class Store {
       date: m.date,
       competition: m.competition,
       round: m.round,
-      home: { id: m.home.id, name: m.home.name, short: m.home.short, color: m.home.color, crest: m.home.crest || null },
-      away: { id: m.away.id, name: m.away.name, short: m.away.short, color: m.away.color, crest: m.away.crest || null },
+      home: this._teamView(m.home.id),
+      away: this._teamView(m.away.id),
       kickoff: m.kickoff,
       kickoffTs: m.kickoffTs,
       status: m.status,
       minute: m.minute,
       score: m.score,
-      xg: m.xg,
+      xg: m.xg || { home: 0, away: 0 },
       stats: m.stats || null,
       halfReport: m.halfReport || null,
-      odds: m.odds,
-      events: m.events.slice(-8),
+      odds: m.odds || { europe: [], asian: [], total: [], corners: [] },
+      events: (m.events || []).slice(-8),
     };
   }
 
   matchById(id) {
-    const m = this.matches.find((x) => x.id === id);
+    const m = this.matches.find((x) => x.id === id || String(x.apiId) === id);
     if (!m) return null;
     const pm = this._publicMatch(m);
-    pm.stats = m.stats || null;
-    pm.halfReport = m.halfReport || null;
+    const ht = this.teamIndex.get(m.home.id);
+    const at = this.teamIndex.get(m.away.id);
     pm.homeTeam = {
-      id: m.home.id, name: m.home.name, short: m.home.short, color: m.home.color, color2: m.home.color2, crest: m.home.crest || null,
-      formation: m.home.formation, lineup: m.home.lineup, recent: m.home.recent,
+      id: m.home.id, name: (ht && ht.name) || m.home.name, short: (ht && ht.short) || '', color: (ht && ht.color) || '#5c6bc0',
+      color2: (ht && ht.color2) || '#3949ab', crest: (ht && ht.crest) || null,
+      formation: (ht && ht.formation) || '', lineup: (ht && ht.lineup) || null, recent: (ht && ht.recent) || [],
     };
     pm.awayTeam = {
-      id: m.away.id, name: m.away.name, short: m.away.short, color: m.away.color, color2: m.away.color2, crest: m.away.crest || null,
-      formation: m.away.formation, lineup: m.away.lineup, recent: m.away.recent,
+      id: m.away.id, name: (at && at.name) || m.away.name, short: (at && at.short) || '', color: (at && at.color) || '#5c6bc0',
+      color2: (at && at.color2) || '#3949ab', crest: (at && at.crest) || null,
+      formation: (at && at.formation) || '', lineup: (at && at.lineup) || null, recent: (at && at.recent) || [],
     };
     return pm;
   }
+
+  team(id) {
+    const t = this.teamIndex.get(String(id));
+    if (!t) return null;
+    const upcoming = this.matches.filter(
+      (m) =>
+        (m.home.id === String(id) || m.away.id === String(id)) &&
+        (m.status === 'live' || m.status === 'upcoming'),
+    );
+    return {
+      id: t.id, name: t.name, en: t.en, short: t.short,
+      color: t.color, color2: t.color2, crest: t.crest, league: t.league,
+      formation: t.formation, lineup: t.lineup, recent: t.recent, form: t.form,
+      matches: upcoming.map((m) => this._publicMatch(m)),
+    };
+  }
+
+  teams() {
+    return [...this.teamIndex.values()].map((t) => ({
+      id: t.id, name: t.name, en: t.en, short: t.short,
+      color: t.color, color2: t.color2, league: t.league, form: t.form,
+    }));
+  }
+
+  /* ---------- WebSocket ---------- */
 
   addClient(ws) {
     this.clients.add(ws);
     ws.on('close', () => this.clients.delete(ws));
   }
 
-  /* 当前在线人数（活跃 WebSocket 连接数） */
   onlineCount() {
     return this.clients.size;
   }

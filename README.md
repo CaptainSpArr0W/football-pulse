@@ -1,17 +1,17 @@
 # 足球脉动 · Football Pulse
 
-一站式足球赛事数据平台：赛程与赔率一览、球队深度档案（阵容 / 近况 / 舆论）、比赛进行时 XG（预期进球）指数实时推送。
+一站式足球赛事数据平台：真实赛程与实时比分、球队深度档案（阵容 / 近况）。全部数据来自 football-data.org，无任何模拟数据。
 
 ## 功能一览
 
 | 模块 | 说明 |
 | --- | --- |
-| 赛程一览 | 按日期（昨天 / 今天 / 明天）与赛事分类筛选，覆盖五大联赛、荷甲、沙特甲、韩K、日职等 16 项赛事 |
-| 赔率数据 | 每场比赛展示 bet365、皇冠、威廉希尔、澳门、必发、中国体育彩票的欧赔，以及亚盘、大小球、角球盘口 |
-| 实时直播 | 进行中的比赛实时推送比分、比赛分钟、XG 双向进度条与关键事件流 |
-| 球队档案 | 点击任意球队名称进入详情页，查看首发阵容阵型图、近六场 XG 场面数据 |
-| 真实数据 | 可选接入 football-data.org 拉取真实赛程、比分、赛果与首发阵容（免费档按映射匹配球队） |
-| 实时更新 | WebSocket 全站推送，比赛进行时 XG 指数实时刷新，比分变化带动画反馈 |
+| 赛程一览 | 按日期（昨天 / 今天 / 明天）与赛事分类筛选，覆盖五大联赛、英冠、葡超、荷甲、巴西甲、欧冠等 13 项赛事（免费档实际开放） |
+| 实时比分 | 进行中的比赛实时推送比分与比赛分钟（WebSocket） |
+| 球队档案 | 点击任意球队名称进入详情页，查看首发阵容阵型图、近六场真实战绩与球队状态串 |
+| 真实数据 | 全部来自 football-data.org v4：赛程、比分、状态、首发阵容、球队近六场 |
+| 数据同步 | 服务端定时拉取（默认 5 分钟），接口限流适配免费档 10 次/分钟 |
+| 订阅收藏 | 本地收藏比赛，订阅人数存于浏览器 localStorage |
 
 ## 快速启动
 
@@ -26,14 +26,28 @@ npm start       # 启动服务
 
 开发模式（代码改动自动重启）：`npm run dev`
 
+## 配置真实数据（必需）
+
+本项目**不包含任何模拟数据**，未配置 API Key 时站点保持空数据。
+
+1. 在 [football-data.org](https://www.football-data.org/) 注册获取免费 API Key。
+2. 配置密钥（二选一）：
+   - 复制 `server/data/api-config.example.json` 为 `server/data/api-config.json` 并填入 key（文件已被 `.gitignore` 排除，不会入库）；
+   - 或设置环境变量 `FOOTBALL_API_KEY`。
+3. 重启服务即可。`server/fetcher.js` 会按间隔（默认 5 分钟）拉取最近三天真实赛程、比分、状态，并对直播/已完场同步首发阵容、对当日涉及球队同步近六场战绩。
+
+免费档 API 实际开放 13 项赛事（配置于 `server/data/competitions.js`）：英超、西甲、德甲、意甲、法甲、英冠、葡超、荷甲、巴西甲、欧冠、解放者杯、欧洲杯、世界杯。未开放的赛事（如韩K、日职、沙特甲等）不会出现在站点中。
+
+免费档不提供的字段（赔率、XG、事件流、实时统计、舆论）对应区块会隐藏或显示「暂无数据」占位，不会出现模拟值。
+
 ## 部署到 Render（免费，一键部署）
 
 仓库根目录已包含 `render.yaml` Blueprint 配置，部署步骤：
 
 1. 注册并登录 [render.com](https://render.com)（可用 GitHub 账号直接登录）。
 2. 点击 **New → Blueprint**，选择本仓库 `CaptainSpArr0W/football-pulse`。
-3. 在环境变量处填写（可留空）：
-   - `FOOTBALL_API_KEY`：你的 football-data.org API Key，留空则运行演示数据模式。
+3. 在环境变量处填写：
+   - `FOOTBALL_API_KEY`：你的 football-data.org API Key（必填，不填则站点为空数据）。
 4. 点击 **Apply**，Render 自动完成构建与部署，完成后得到访问地址：`https://football-pulse.onrender.com`。
 
 注意事项：
@@ -48,16 +62,13 @@ npm start       # 启动服务
 football-pulse/
 ├── server/
 │   ├── index.js            # Express + WebSocket 入口
-│   ├── store.js            # 内存数据仓库与广播
-│   ├── xgEngine.js         # XG 实时引擎（事件剧本推进）
-│   ├── fetcher.js          # 真实数据同步层（football-data.org）
+│   ├── store.js            # 内存数据仓库（启动为空，由 fetcher 填充）
+│   ├── fetcher.js          # 真实数据同步层（football-data.org，含限流）
 │   └── data/
-│       ├── matches.js      # 赛事 + 赔率数据
-│       ├── teams.js        # 球队阵容 / 近况 / 舆论数据
-│       ├── crests.json     # 队标文件名映射
+│       ├── competitions.js # 可接入赛事配置（免费档开放的 13 项）
 │       └── api-config.example.json  # API 配置模板（复制为 api-config.json 使用）
 ├── public/
-│   ├── index.html          # 首页：赛程 + 赔率 + 直播
+│   ├── index.html          # 首页：赛程 + 实时比分
 │   ├── match.html          # 比赛详情页
 │   ├── team.html           # 球队详情页
 │   ├── css/style.css       # 设计系统
@@ -77,26 +88,10 @@ REST 接口：
 | `GET /api/match/:id` | 单场比赛详情 |
 | `GET /api/teams` | 球队列表 |
 
-实时推送：`ws://localhost:3000/ws`，连接后立即收到进行中比赛快照，此后每数秒推送一次 `live-update` 消息，字段包含 `score`、`xg`、`minute`、`events`。
-
-## 接入真实数据源（football-data.org）
-
-服务内置模拟数据，可随时切换为真实数据，前端无需改动：
-
-1. 在 [football-data.org](https://www.football-data.org/) 注册获取免费 API Key。
-2. 配置密钥（二选一）：
-   - 复制 `server/data/api-config.example.json` 为 `server/data/api-config.json` 并填入 key（文件已被 `.gitignore` 排除，不会入库）；
-   - 或设置环境变量 `FOOTBALL_API_KEY`。
-3. 重启服务，`server/fetcher.js` 会按间隔（默认 5 分钟）拉取真实赛程 / 比分 / 状态，并对已完场自动回填球队近况，对进行中或已完场同步首发阵容（免费档未开放的场次自动跳过，全程静默降级为模拟数据）。
-
-球队 ID 映射位于 `fetcher.js` 的 `KNOWN_TEAM_IDS`（已覆盖英超、西甲、德甲、意甲、法甲、葡超部分球队），可另建 `server/data/api-team-map.json` 追加映射。
-
-## 演示机制
-
-未配置 API Key 或接口不可用时，内置数据基于真实球队与赛事背景构建，开球时间随服务器本地日期动态生成。为保证页面随时打开都有直播，两场进行中的比赛（阿森纳 vs 利物浦、曼联 vs 切尔西）由 XG 引擎按剧本推进，约 2.5 分钟踢完一场后自动重置重开。
+实时推送：`ws://localhost:3000/ws`，连接后立即收到进行中比赛快照，此后每次数据同步推送 `live-update`（比分 / 状态 / 分钟）与 `data-refreshed`（通知前端重新拉取）。
 
 ## 技术栈
 
 - 后端：Node.js + Express + ws（WebSocket）
 - 前端：原生 HTML / CSS / JavaScript，无构建步骤
-- 数据：内存化演示数据，结构对齐真实接口
+- 数据：football-data.org v4 REST API（免费档 10 次/分钟，服务端限流适配）

@@ -19,23 +19,25 @@
     if (team.crest) {
       $('#teamCrest').innerHTML = `<img src="${esc(team.crest)}" alt="${esc(team.name)}" class="team-crest-img" loading="lazy">`;
     } else {
-      $('#teamCrest').textContent = team.short;
+      $('#teamCrest').textContent = team.short || '—';
       $('#teamCrest').style.background = `linear-gradient(140deg, ${team.color}, ${team.color2})`;
     }
     $('#teamName').textContent = team.name;
-    $('#teamEn').textContent = team.en.toUpperCase() + ' · ' + team.short;
+    $('#teamEn').textContent = ((team.en || team.name || '').toUpperCase() + ' · ' + (team.short || ''));
 
+    const fact = (v) => (v == null || v === '' ? '--' : v);
     $('#teamFacts').innerHTML = [
-      ['联赛', team.league],
-      ['主教练', team.coach],
-      ['主场', team.stadium],
-      ['城市', team.city],
-      ['常用阵型', team.formation],
+      ['联赛', fact(team.league)],
+      ['主教练', fact(team.coach)],
+      ['主场', fact(team.stadium)],
+      ['城市', fact(team.city)],
+      ['常用阵型', fact(team.formation)],
     ].map(([k, v]) => `<li><span>${k}</span>${esc(v)}</li>`).join('');
 
-    $('#formChips').innerHTML = [...team.form]
-      .map((r) => `<span class="form-chip ${formResultClass(r)}">${r === 'W' ? '胜' : r === 'D' ? '平' : '负'}</span>`)
-      .join('');
+    const form = (team.form || '').split('');
+    $('#formChips').innerHTML = form.length
+      ? form.map((r) => `<span class="form-chip ${formResultClass(r)}">${r === 'W' ? '胜' : r === 'D' ? '平' : '负'}</span>`).join('')
+      : '<span style="color:var(--ink-3);font-size:12px">暂无数据</span>';
   }
 
   /* ---------- 相关赛事 ---------- */
@@ -49,10 +51,12 @@
 
   /* ---------- 近六场 ---------- */
   function renderRecent(team) {
-    $('#recentGrid').innerHTML = team.recent.map((r, i) => {
-      const total = r.xg + r.xga || 1;
-      const wXg = ((r.xg / total) * 100).toFixed(1);
-      const wXga = ((r.xga / total) * 100).toFixed(1);
+    const recent = team.recent || [];
+    if (!recent.length) {
+      $('#recentGrid').innerHTML = '<div class="empty-state">暂无近期战绩（免费档 API 未提供该队数据）</div>';
+      return;
+    }
+    $('#recentGrid').innerHTML = recent.map((r, i) => {
       const isHome = r.home ? '主场' : '客场';
       return `<div class="recent-card" style="animation-delay:${i * 60}ms">
         <div class="recent-head">
@@ -61,16 +65,7 @@
         </div>
         <div class="recent-opp">vs ${esc(r.opponent)}</div>
         <div class="recent-score">${r.gf} : ${r.ga}</div>
-        <div class="xg-compare">
-          <div class="xg-compare-line">
-            <span>XG ${r.xg.toFixed(1)}</span>
-            <div class="xg-compare-track"><div class="xg-compare-fill" style="width:${wXg}%"></div></div>
-          </div>
-          <div class="xg-compare-line away-line">
-            <span>${r.xga.toFixed(1)} XGA</span>
-            <div class="xg-compare-track"><div class="xg-compare-fill" style="width:${wXga}%"></div></div>
-          </div>
-        </div>
+        <div class="recent-date">${esc(r.date)}</div>
       </div>`;
     }).join('');
   }
@@ -111,7 +106,7 @@
   /* ---------- 舆论 ---------- */
   function renderNews(team) {
     if (!team.news || !team.news.length) {
-      $('#newsList').innerHTML = '<div class="empty-state">暂无舆论数据，接入真实数据源后可查看</div>';
+      $('#newsList').innerHTML = '<div class="empty-state">暂无舆论数据（免费档 API 未提供）</div>';
       return;
     }
     $('#newsList').innerHTML = team.news.map((n, i) => `
@@ -147,18 +142,31 @@
   }
 
   /* ---------- 初始化 ---------- */
+  async function fetchTeam() {
+    const res = await fetch(`/api/team/${encodeURIComponent(teamId)}`);
+    if (!res.ok) throw new Error('not found');
+    return (await res.json()).team;
+  }
+
+  function renderTeam(team) {
+    document.title = `${team.name} · 足球脉动`;
+    renderBanner(team);
+    renderTeamMatches(team);
+    renderRecent(team);
+    renderLineup(team);
+    renderNews(team);
+  }
+
   async function init() {
     try {
-      const res = await fetch(`/api/team/${encodeURIComponent(teamId)}`);
-      if (!res.ok) throw new Error('not found');
-      const { team } = await res.json();
-      document.title = `${team.name} · 足球脉动`;
-      renderBanner(team);
-      renderTeamMatches(team);
-      renderRecent(team);
-      renderLineup(team);
-      renderNews(team);
-      connectWS(applyLiveUpdate);
+      renderTeam(await fetchTeam());
+      connectWS((data) => {
+        if (data.type === 'data-refreshed') {
+          fetchTeam().then(renderTeam).catch(() => {});
+          return;
+        }
+        applyLiveUpdate(data);
+      });
     } catch (_) {
       $('#teamName').textContent = '球队不存在';
       $('#teamEn').textContent = '请返回赛程页重新选择';

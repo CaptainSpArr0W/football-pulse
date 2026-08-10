@@ -22,7 +22,7 @@ app.use(express.json());
 app.get('/api/overview', (req, res) => {
   const dates = store.availableDates();
   const byDate = {};
-  for (const d of dates) byDate[d] = store.matchesByDate(d);
+  for (const d of dates) byDate[d] = store.matchesByDate(d).map((m) => store._publicMatch(m));
   res.json({ today: store.today, dates, competitions: store.competitions(), byDate });
 });
 
@@ -30,7 +30,7 @@ app.get('/api/overview', (req, res) => {
 app.get('/api/matches', (req, res) => {
   const { date } = req.query;
   const list = date ? store.matchesByDate(date) : store.matches;
-  res.json({ date: date || null, matches: list });
+  res.json({ date: date || null, matches: list.map((m) => store._publicMatch(m)) });
 });
 
 /* 球队列表 */
@@ -87,9 +87,8 @@ const fetcher = require('./fetcher');
 fetcher.start(store);
 
 server.listen(PORT, () => {
-  store.boot();
   console.log(`⚽ Football Pulse 已启动`);
   console.log(`   页面地址   http://localhost:${PORT}`);
   console.log(`   实时推送   ws://localhost:${PORT}/ws`);
-  console.log(`   进行中比赛 ${store.engine.running().length} 场，XG 引擎已运行`);
+  console.log(`   进行中比赛 ${store.matches.filter((m) => m.status === 'live').length} 场`);
 });

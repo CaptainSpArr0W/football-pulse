@@ -73,7 +73,7 @@
       ? `<span data-role="hs">${m.score.home}</span> : <span data-role="as">${m.score.away}</span>`
       : score;
 
-    if (isLive) renderHeroXg(m);
+    if (isLive && m.xg && m.xg.home + m.xg.away > 0) renderHeroXg(m);
     else $('#heroXg').innerHTML = '';
   }
 
@@ -104,10 +104,15 @@
 
   function renderStats(m) {
     const s = m.stats;
-    if (!s) return;
+    if (!s) {
+      $('#statsGrid').innerHTML = '<div class="empty-state">暂无实时统计（免费档 API 不提供）</div>';
+      return;
+    }
     $('#statsGrid').innerHTML = STAT_DEFS.map(([key, label, isPct]) => {
-      const h = isPct ? `${s[key].home}%` : s[key].home;
-      const a = isPct ? `${s[key].away}%` : s[key].away;
+      const hv = s[key] && s[key].home;
+      const av = s[key] && s[key].away;
+      const h = isPct ? `${hv}%` : hv;
+      const a = isPct ? `${av}%` : av;
       return `<div class="stat-row">
         <span class="stat-val home" data-stat="${key}-h">${h}</span>
         <span class="stat-label">${label}</span>
@@ -143,9 +148,14 @@
     showHalfReport(m.halfReport);
   }
 
-  /* ---------- 赔率（复用公共组件） ---------- */
+  /* ---------- 赔率（无真实赔率数据时隐藏整块） ---------- */
   function renderOdds(m) {
-    $('#oddsWrap').innerHTML = oddsTable(m);
+    const wrap = $('#oddsWrap');
+    wrap.innerHTML = oddsTable(m);
+    const hasOdds = m.odds && ((m.odds.europe && m.odds.europe.length) || (m.odds.asian && m.odds.asian.length)
+      || (m.odds.total && m.odds.total.length) || (m.odds.corners && m.odds.corners.length));
+    const section = wrap.closest('section');
+    if (section) section.hidden = !hasOdds;
   }
 
   /* ---------- 双方阵容 ---------- */
@@ -170,11 +180,18 @@
 
   /* ---------- 近六场 ---------- */
   function recentCol(team) {
-    const form = [...team.form].map((r) => {
+    const recent = team.recent || [];
+    if (!recent.length) {
+      return `<div class="recent-col">
+        <div class="lineup-col-head">${crestHtml(team)} ${esc(team.name)}</div>
+        <div class="empty-state" style="margin:8px 0">暂无近期战绩（免费档 API 未提供该队数据）</div>
+      </div>`;
+    }
+    const form = [...(team.form || '')].map((r) => {
       const txt = r === 'W' ? '胜' : r === 'D' ? '平' : '负';
       return `<span class="form-chip ${formResultClass(r)}">${txt}</span>`;
     }).join('');
-    const rows = team.recent.map((r) => {
+    const rows = recent.map((r) => {
       const hs = r.home ? '主' : '客';
       return `<div class="recent-line">
         <span class="recent-line-date">${esc(r.date)}</span>
@@ -247,24 +264,35 @@
   }
 
   /* ---------- 初始化 ---------- */
+  async function fetchMatch() {
+    const res = await fetch(`/api/match/${encodeURIComponent(matchId)}`);
+    if (!res.ok) throw new Error('not found');
+    return (await res.json()).match;
+  }
+
+  function renderMatch(match) {
+    current = match;
+    document.title = `${match.home.name} vs ${match.away.name} · 足球脉动`;
+    renderHero(match);
+    $('#liveDataSection').hidden = match.status !== 'live';
+    if (match.status === 'live') {
+      renderStats(match);
+      renderEvents(match);
+      renderHalfReport(match);
+    }
+    renderOdds(match);
+    renderLineups(match);
+    renderRecent(match);
+  }
+
   async function init() {
     try {
-      const res = await fetch(`/api/match/${encodeURIComponent(matchId)}`);
-      if (!res.ok) throw new Error('not found');
-      const { match } = await res.json();
-      current = match;
-      document.title = `${match.home.name} vs ${match.away.name} · 足球脉动`;
-      renderHero(match);
-      $('#liveDataSection').hidden = match.status !== 'live';
-      if (match.status === 'live') {
-        renderStats(match);
-        renderEvents(match);
-        renderHalfReport(match);
-      }
-      renderOdds(match);
-      renderLineups(match);
-      renderRecent(match);
+      renderMatch(await fetchMatch());
       connectWS((data) => {
+        if (data.type === 'data-refreshed') {
+          fetchMatch().then(renderMatch).catch(() => {});
+          return;
+        }
         if (data.type === 'half-time-report') { showHalfReport(data.report); return; }
         applyLiveUpdate(data);
       });
