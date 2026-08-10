@@ -471,7 +471,7 @@ const ZH = {
   'atlético de san luis': '圣路易斯竞技', 'san luis': '圣路易斯竞技',
 };
 
-/* 变音符号归一化 + 中英对照查询（供 fetcher / statsbomb 复用） */
+/* 变音符号归一化 + 中英对照查询（供 fetcher 使用） */
 const _norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 const NORM = {};
 for (const k of Object.keys(ZH)) NORM[_norm(k)] = ZH[k];
