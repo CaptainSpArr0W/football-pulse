@@ -1,0 +1,19 @@
+# Render Blueprint — 一键部署 Football Pulse
+# 使用方式：登录 render.com → New → Blueprint → 关联本 GitHub 仓库 → 应用即可
+# 更多说明见 README.md「部署到 Render」一节
+services:
+  - type: web
+    name: football-pulse
+    runtime: node
+    plan: free
+    autoDeploy: true
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      # 服务器时区设为北京时区，保证「今天」的比赛日期与国内用户一致
+      - key: TZ
+        value: Asia/Shanghai
+      # football-data.org API Key（可选，留空则运行演示数据模式）
+      # 部署时 Render 会提示你填写，不填也能正常启动
+      - key: FOOTBALL_API_KEY
+        sync: false

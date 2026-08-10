@@ -26,6 +26,22 @@ npm start       # 启动服务
 
 开发模式（代码改动自动重启）：`npm run dev`
 
+## 部署到 Render（免费，一键部署）
+
+仓库根目录已包含 `render.yaml` Blueprint 配置，部署步骤：
+
+1. 注册并登录 [render.com](https://render.com)（可用 GitHub 账号直接登录）。
+2. 点击 **New → Blueprint**，选择本仓库 `CaptainSpArr0W/football-pulse`。
+3. 在环境变量处填写（可留空）：
+   - `FOOTBALL_API_KEY`：你的 football-data.org API Key，留空则运行演示数据模式。
+4. 点击 **Apply**，Render 自动完成构建与部署，完成后得到访问地址：`https://football-pulse.onrender.com`。
+
+注意事项：
+
+- 免费档闲置 15 分钟会自动休眠，下次访问需等待约 1 分钟自动唤醒（页面会先显示加载提示）。
+- 服务已设置 `TZ=Asia/Shanghai`，比赛日期按北京时间生成。
+- 推送新代码到 `main` 分支会自动触发重新部署。
+
 ## 目录结构
 
 ```
