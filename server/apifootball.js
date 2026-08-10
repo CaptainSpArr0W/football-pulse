@@ -30,9 +30,32 @@ const KEY = process.env.API_FOOTBALL_KEY || loadConfig().key || '';
 function log(msg) { console.log(`[apifootball] ${msg}`); }
 const notify = require('./notify');
 
-/* ---------- 每日配额（按北京时间自然日重置，0 点整点重置 + 惰性兜底） ---------- */
+/* ---------- 每日配额（按北京时间自然日重置，0 点整点重置 + 惰性兜底；持久化防重启丢失） ---------- */
 const THRESHOLDS = [50, 75, 90]; // 用量百分比告警阈值
-const budget = { date: '', count: 0, alerted: new Set() };
+const USAGE_FILE = path.join(__dirname, 'data', 'apifootball-usage.json');
+const budget = loadBudget();
+
+function loadBudget() {
+  try {
+    const raw = fs.readFileSync(USAGE_FILE, 'utf8');
+    const j = JSON.parse(raw);
+    return { date: j.date || '', count: j.count || 0, alerted: new Set(j.alerted || []) };
+  } catch (_) {
+    return { date: '', count: 0, alerted: new Set() };
+  }
+}
+
+/* 持久化配额状态（写入本地文件，服务重启后不丢计数） */
+let saveTimer = null;
+function saveBudget() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      fs.writeFileSync(USAGE_FILE, JSON.stringify({ date: budget.date, count: budget.count, alerted: [...budget.alerted] }));
+    } catch (_) { /* 忽略写入失败 */ }
+  }, 800);
+}
 
 function bjToday() {
   const d = new Date(Date.now() + 8 * 3600 * 1000);
@@ -46,6 +69,7 @@ function ensureDailyReset() {
     budget.date = t;
     budget.count = 0;
     budget.alerted.clear();
+    saveBudget();
     log(`配额已按天重置（${t}，上限 ${DAILY_LIMIT} 次/天）`);
   }
 }
@@ -65,6 +89,7 @@ scheduleMidnightReset();
 function useBudget() {
   ensureDailyReset();
   budget.count += 1;
+  saveBudget();
   const c = budget.count;
   if (c % 10 === 0 || c === SAFE_LIMIT) log(`今日 API 配额已用 ${c}/${DAILY_LIMIT}`);
   checkThresholds(c);

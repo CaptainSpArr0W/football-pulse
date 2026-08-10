@@ -6,6 +6,7 @@ server/data/api-config.json
 server/data/apifootball-config.json
 server/data/notify-config.json
 server/data/api-team-map.json
+server/data/apifootball-usage.json
 .env
 .env.*
 
