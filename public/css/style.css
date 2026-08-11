@@ -532,11 +532,6 @@ a.news-title:hover { color: var(--brand); text-decoration: underline; }
 .mi-key { font-size: 11.5px; color: var(--ink-3); }
 .match-info-item b { font-size: 15px; color: var(--ink); }
 
-/* ---------- 五大联赛球员榜 ---------- */
-.topscorers-type { display: flex; gap: 8px; margin-bottom: 12px; }
-.ts-type-btn { border: 1px solid var(--line); background: var(--bg-soft); color: var(--ink-2); font-size: 12.5px; padding: 6px 14px; border-radius: 999px; cursor: pointer; transition: all .15s; }
-.ts-type-btn.active { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
-
 /* ---------- 页脚 ---------- */
 .site-footer { border-top: 1px solid var(--line); margin-top: 50px; padding: 22px 0; }
 .site-footer p { font-size: 12px; color: var(--ink-3); text-align: center; }

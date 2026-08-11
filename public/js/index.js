@@ -336,50 +336,6 @@
       <p class="standings-note">数据来源 ${cur.source}</p>`;
   }
 
-  /* ---------- 五大联赛球员榜（射手/助攻/评分，Sofascore） ---------- */
-  let tsLeague = '英超';
-  let tsStat = 'goals';
-  async function loadTopscorers() {
-    try {
-      const res = await fetch(`/api/topscorers?league=${encodeURIComponent(tsLeague)}&stat=${tsStat}`);
-      const j = await res.json();
-      if (!j || j.error) throw new Error(j && j.error);
-      $('#topscorersSection').hidden = false;
-      renderTopscorers(j.players || []);
-    } catch (_) {
-      $('#topscorersSection').hidden = false;
-      $('#topscorersWrap').innerHTML = '<p class="empty-state">球员榜暂不可用（Sofascore 需海外网络）</p>';
-    }
-  }
-  function renderTopscorers(players) {
-    const tabs = $('#topscorersTabs');
-    tabs.innerHTML = BIG_FIVE.map((l) =>
-      `<button class="standings-tab${l === tsLeague ? ' active' : ''}" data-league="${esc(l)}">${esc(l)}</button>`).join('');
-    tabs.querySelectorAll('.standings-tab').forEach((btn) => {
-      btn.addEventListener('click', () => { tsLeague = btn.dataset.league; loadTopscorers(); });
-    });
-    document.querySelectorAll('.ts-type-btn').forEach((b) => {
-      b.classList.toggle('active', b.dataset.stat === tsStat);
-    });
-    const wrap = $('#topscorersWrap');
-    if (!players.length) {
-      wrap.innerHTML = '<p class="empty-state">暂无数据（Sofascore 需海外网络，请连接加速后刷新）</p>';
-      return;
-    }
-    const head = tsStat === 'goals' ? '进球' : tsStat === 'assists' ? '助攻' : '评分';
-    const rows = players.map((p, i) => `<tr>
-      <td class="st-rank">${i + 1}</td>
-      <td class="st-team">${esc(p.name)} <small style="color:var(--ink-3)">${esc(p.position || '')}</small></td>
-      <td class="st-team" style="color:var(--ink-3)">${esc(p.team)}</td>
-      <td>${p.games != null ? p.games : '-'}</td>
-      <td class="st-pts">${tsStat === 'rating' ? Number(p.value).toFixed(2) : p.value}</td>
-    </tr>`).join('');
-    wrap.innerHTML = `<table class="standings-table">
-      <thead><tr><th>#</th><th>球员</th><th>球队</th><th>出场</th><th>${head}</th></tr></thead>
-      <tbody>${rows}</tbody></table>
-      <p class="standings-note">数据来源 Sofascore（需海外网络）· 每 12 小时更新</p>`;
-  }
-
   /* ---------- 手动刷新 ---------- */
   let refreshing = false;
   let refreshCoolDown = 0;
@@ -408,7 +364,6 @@
         renderFilters();
         renderSelect();
         loadStandings(true);
-        loadTopscorers();
         refreshCoolDown = Date.now() + 30 * 1000;
       } else {
         txt.textContent = '刷新失败';
@@ -437,13 +392,6 @@
     render();
     $('#refreshBtn').addEventListener('click', refreshData);
     loadStandings(false);
-    loadTopscorers();
-    $('#topscorersType').addEventListener('click', (e) => {
-      const btn = e.target.closest('.ts-type-btn');
-      if (!btn) return;
-      tsStat = btn.dataset.stat;
-      loadTopscorers();
-    });
     connectWS((data) => {
       if (data.type === 'opportunity') { applyOpp(data); return; }
       if (data.type === 'data-refreshed') { refetchOverview(); return; }

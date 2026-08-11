@@ -130,18 +130,6 @@ app.get('/api/match/preview/:id', async (req, res) => {
   }
 });
 
-/* 五大联赛射手榜/助攻榜（Sofascore；海外网络不可用时返回空数组） */
-app.get('/api/topscorers', async (req, res) => {
-  try {
-    const league = req.query.league || '英超';
-    const stat = req.query.stat || 'goals';
-    const list = await require('./topscorers').list(league, stat);
-    res.json({ league, stat, players: list });
-  } catch (err) {
-    res.status(502).json({ error: `射手榜获取失败：${err.message}` });
-  }
-});
-
 /* 五大联赛积分榜（免费源：Fotmob 主 → Sofascore/FBref 备；?force=1 绕过缓存） */
 app.get('/api/standings', async (req, res) => {
   try {
