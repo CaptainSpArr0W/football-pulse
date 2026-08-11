@@ -46,6 +46,11 @@ const ZH = {
   'mallorca': '马略卡', 'rcd mallorca': '马略卡',
   'rayo vallecano': '巴列卡诺', 'rayo vallecano de madrid': '巴列卡诺',
   'deportivo alaves': '阿拉维斯', 'alaves': '阿拉维斯',
+  'deportivo a coruna': '拉科鲁尼亚', 'deportivo de la coruna': '拉科鲁尼亚', 'deportivo la coruna': '拉科鲁尼亚', 'rc deportivo de la coruna': '拉科鲁尼亚',
+  'elche': '埃尔切', 'elche cf': '埃尔切',
+  'levante': '莱万特', 'levante ud': '莱万特', 'levante union deportiva': '莱万特',
+  'malaga': '马拉加', 'malaga cf': '马拉加', 'málaga cf': '马拉加',
+  'racing santander': '桑坦德竞技', 'racing de santander': '桑坦德竞技', 'racing club de santander': '桑坦德竞技',
   'espanyol': '西班牙人', 'rcd espanyol': '西班牙人',
   'leganes': '莱加内斯', 'cd leganes': '莱加内斯',
   'real valladolid': '巴拉多利德', 'real valladolid cf': '巴拉多利德',
@@ -54,7 +59,7 @@ const ZH = {
   'granada': '格拉纳达', 'granada cf': '格拉纳达',
 
   /* ---------- 德甲 ---------- */
-  'bayern munich': '拜仁慕尼黑', 'fc bayern munchen': '拜仁慕尼黑', 'fc bayern münchen': '拜仁慕尼黑',
+  'bayern munich': '拜仁慕尼黑', 'fc bayern munchen': '拜仁慕尼黑', 'fc bayern münchen': '拜仁慕尼黑', 'bayern munchen': '拜仁慕尼黑', 'bayern münchen': '拜仁慕尼黑',
   'borussia dortmund': '多特蒙德', 'bv borussia dortmund': '多特蒙德',
   'rb leipzig': '莱比锡红牛', 'rasenballsport leipzig': '莱比锡红牛',
   'bayer leverkusen': '勒沃库森', 'bayer 04 leverkusen': '勒沃库森',
@@ -62,7 +67,7 @@ const ZH = {
   'vfl wolfsburg': '沃尔夫斯堡', 'wolfsburg': '沃尔夫斯堡',
   'borussia monchengladbach': '门兴格拉德巴赫', 'borussia mönchengladbach': '门兴格拉德巴赫',
   'sc freiburg': '弗赖堡', 'freiburg': '弗赖堡',
-  'tsg hoffenheim': '霍芬海姆', '1899 hoffenheim': '霍芬海姆',
+  'tsg hoffenheim': '霍芬海姆', '1899 hoffenheim': '霍芬海姆', 'hoffenheim': '霍芬海姆',
   'mainz 05': '美因茨', '1. fs v mainz 05': '美因茨',
   'fc augsburg': '奥格斯堡', 'augsburg': '奥格斯堡',
   'werder bremen': '云达不莱梅', 'sv werder bremen': '云达不莱梅',
@@ -73,6 +78,10 @@ const ZH = {
   'holstein kiel': '荷尔斯泰因基尔', 'kiel': '荷尔斯泰因基尔',
   'vfl bochum': '波鸿', 'bochum': '波鸿',
   '1. fc heidenheim': '海登海姆', 'heidenheim': '海登海姆',
+  'elversberg': '埃尔弗斯贝格', 'sv elversberg': '埃尔弗斯贝格',
+  'hamburger sv': '汉堡', 'hamburg': '汉堡', 'hsv': '汉堡',
+  'paderborn': '帕德博恩', 'sc paderborn': '帕德博恩', 'sc paderborn 07': '帕德博恩',
+  'schalke 04': '沙尔克04', 'fc schalke 04': '沙尔克04', 'schalke': '沙尔克04',
 
   /* ---------- 意甲 ---------- */
   'inter': '国际米兰', 'inter milan': '国际米兰', 'fc internazionale': '国际米兰',
@@ -96,6 +105,7 @@ const ZH = {
   'parma': '帕尔马', 'parma calcio 1913': '帕尔马',
   'monza': '蒙扎', 'ac monza': '蒙扎',
   'venezia': '威尼斯', 'venezia fc': '威尼斯',
+  'frosinone': '弗罗西诺内', 'frosinone calcio': '弗罗西诺内',
 
   /* ---------- 法甲 ---------- */
   'psg': '巴黎圣日耳曼', 'paris saint-germain': '巴黎圣日耳曼', 'paris saint germain': '巴黎圣日耳曼',
@@ -116,6 +126,10 @@ const ZH = {
   'le havre': '勒阿弗尔', 'le havre ac': '勒阿弗尔',
   'angers': '昂热', 'angers sco': '昂热',
   'saint-etienne': '圣埃蒂安', 'as saint-Étienne': '圣埃蒂安',
+  'le mans': '勒芒', 'le mans fc': '勒芒', 'le mans fc 72': '勒芒',
+  'lorient': '洛里昂', 'fc lorient': '洛里昂', 'fc lorient bretagne sud': '洛里昂',
+  'paris fc': '巴黎FC', 'paris football club': '巴黎FC', 'paris fc 98': '巴黎FC',
+  'troyes': '特鲁瓦', 'estac troyes': '特鲁瓦', 'es troyes ac': '特鲁瓦',
 
   /* ---------- 英冠 ---------- */
   'burnley': '伯恩利', 'burnley fc': '伯恩利',

@@ -73,6 +73,7 @@ async function fotmobStandings(leagueName, force) {
       rank: r.idx,
       name: TEAM_NAMES_ZH.zhTeamName(r.name, r.shortName) || r.name || r.shortName,
       en: r.name || '',
+      fmId: r.id,
       played: r.played || 0,
       win: r.wins || 0,
       draw: r.draws || 0,
@@ -315,7 +316,7 @@ async function fbrefStandings(leagueName, force) {
 
 const BIG_FIVE = ['英超', '西甲', '德甲', '意甲', '法甲'];
 
-/* 五大联赛积分榜：Fotmob → Sofascore → FBref 依次降级 */
+/* 五大联赛积分榜：Fotmob → Sofascore → FBref 依次降级；行内附带 storeId（命中站点球队库时）与 fmId（Fotmob id） */
 async function standingsAll(force) {
   const out = [];
   for (const name of BIG_FIVE) {
@@ -326,7 +327,96 @@ async function standingsAll(force) {
     }
     if (s && s.rows && s.rows.length) out.push(s);
   }
+  // 关联站点球队 id（按英文名匹配 store.teamIndex），供积分榜点击跳转球队页
+  const store = require('./store');
+  const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
+  for (const l of out) {
+    for (const row of l.rows) {
+      const rn = norm(row.en);
+      if (!rn) continue;
+      for (const t of store.teamIndex.values()) {
+        const tn = norm(t.en) || norm(t.name);
+        if (tn && (rn.includes(tn) || tn.includes(rn))) { row.storeId = t.id; break; }
+      }
+    }
+  }
   return out;
+}
+
+/* Fotmob 球队档案（供非 store 球队的详情页降级填充：横幅/近六场/相关赛事） */
+const LEAGUE_ZH = { 'premier league': '英超', 'la liga': '西甲', 'bundesliga': '德甲', 'serie a': '意甲', 'ligue 1': '法甲' };
+async function fotmobTeam(teamId) {
+  const j = await fotmobGet(`/teams?id=${teamId}`, 6 * 3600 * 1000, false);
+  const d = j.details || {};
+  const o = j.overview || {};
+  const color = (o.teamColors && (o.teamColors.darkMode || o.teamColors.lightMode)) || '#5c6bc0';
+  const venue = o.venue && o.venue.widget ? o.venue.widget : null;
+  const coach = (o.coachHistory && o.coachHistory[0]) ? o.coachHistory[0].name : null;
+  const en = d.name || '';
+  const zh = TEAM_NAMES_ZH.zhTeamName(en, d.shortName);
+  const nameOf = (f, side) => {
+    const v = f && f[side];
+    return v && typeof v === 'object' ? String(v.name || '') : String(v || '');
+  };
+  const idOf = (f, side) => {
+    const v = f && f[side];
+    return v && typeof v === 'object' ? String(v.id || '') : '';
+  };
+  const compOf = (f) => {
+    const pick = (v) => (v && typeof v === 'object' ? (v.name || '') : (typeof v === 'string' ? v : ''));
+    return pick(f.displayTournament) || pick(f.tournament);
+  };
+  // 近六场：从 overviewFixtures 取已完场（前 6 场）
+  const fixtures = Array.isArray(o.overviewFixtures) ? o.overviewFixtures : [];
+  const finished = fixtures.filter((f) => f.status && f.status.finished);
+  const recent = finished.slice(0, 6).map((f) => {
+    const hn = nameOf(f, 'home');
+    const an = nameOf(f, 'away');
+    const isHome = hn === en;
+    const parts = String(f.status.scoreStr || '').split('-');
+    const gf = parseInt(parts[0], 10) || 0;
+    const ga = parseInt(parts[1], 10) || 0;
+    return {
+      comp: compOf(f),
+      home: isHome,
+      result: f.result === 1 ? 'W' : f.result === -1 ? 'L' : 'D',
+      opponent: isHome ? an : hn,
+      gf: isHome ? gf : ga,
+      ga: isHome ? ga : gf,
+      date: f.status && f.status.utcTime ? new Date(f.status.utcTime).toISOString().slice(0, 10) : '',
+    };
+  });
+  // 相关赛事：未开赛的未来比赛
+  const upcoming = fixtures.filter((f) => f.notStarted);
+  const matches = upcoming.slice(0, 6).map((f) => {
+    const hn = nameOf(f, 'home');
+    const an = nameOf(f, 'away');
+    return {
+      id: `fm-${f.id}`,
+      date: f.status && f.status.utcTime ? new Date(f.status.utcTime).toISOString().slice(0, 10) : '',
+      competition: compOf(f),
+      round: '',
+      home: { id: idOf(f, 'home'), name: hn, short: hn.slice(0, 3).toUpperCase(), color, color2: color, crest: null },
+      away: { id: idOf(f, 'away'), name: an, short: an.slice(0, 3).toUpperCase(), color: '#5c6bc0', color2: '#3949ab', crest: null },
+      kickoff: f.status && f.status.utcTime ? new Date(f.status.utcTime).toISOString().slice(11, 16) : '',
+      kickoffTs: f.status && f.status.utcTime ? Date.parse(f.status.utcTime) : 0,
+      status: 'upcoming', minute: null,
+      score: { home: 0, away: 0 }, xg: { home: 0, away: 0 },
+      odds: { europe: [], asian: [], total: [], corners: [] }, events: [],
+      oppXg: false, oppHc: false,
+    };
+  });
+  const form = Array.isArray(o.teamForm)
+    ? o.teamForm.map((x) => (x.resultString || (x.result === 1 ? 'W' : x.result === -1 ? 'L' : 'D'))).join('').slice(0, 6)
+    : '';
+  return {
+    id: `fm:${teamId}`, name: zh || en, en, short: d.shortName || en,
+    color, color2: color, crest: `https://images.fotmob.com/image_resources/logo/teamlogo/${teamId}.png`,
+    league: LEAGUE_ZH[String(d.primaryLeagueName || '').toLowerCase()] || d.primaryLeagueName || '',
+    coach, stadium: venue ? venue.name : '', city: venue ? venue.city : '',
+    formation: '', lineup: null, recent, form, matches,
+    news: [],
+  };
 }
 
 /* 实时 xG（Fotmob，优先免费源）：返回 {home, away} 或 null；命中后缓存 Fotmob matchId 到 match._fotmobId */
@@ -374,4 +464,4 @@ async function enrichMatch(match, force) {
   }
 }
 
-module.exports = { standingsAll, enrichMatch, fotmobMatchesByDate, fotmobMatchDetails, liveXg };
+module.exports = { standingsAll, enrichMatch, fotmobMatchesByDate, fotmobMatchDetails, liveXg, fotmobTeam };

@@ -42,9 +42,16 @@ app.get('/api/matches', (req, res) => {
 /* 球队列表 */
 app.get('/api/teams', (req, res) => res.json({ teams: store.teams() }));
 
-/* 球队详情：档案 + 阵容 + 近六场 + 舆论 + 相关赛事 */
-app.get('/api/team/:id', (req, res) => {
-  const team = store.team(req.params.id);
+/* 球队详情：档案 + 阵容 + 近六场 + 舆论 + 相关赛事
+ * 命中站点球队库直接返回；否则（fm: 前缀）用 Fotmob 免费源降级填充 */
+app.get('/api/team/:id', async (req, res) => {
+  let team = store.team(req.params.id);
+  if (!team && String(req.params.id).startsWith('fm:')) {
+    try {
+      const free = require('./freefootball');
+      team = await free.fotmobTeam(String(req.params.id).slice(3));
+    } catch (_) { team = null; }
+  }
   if (!team) return res.status(404).json({ error: '球队不存在' });
   res.json({ team });
 });
