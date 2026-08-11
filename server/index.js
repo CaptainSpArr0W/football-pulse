@@ -138,6 +138,9 @@ setInterval(pushOnline, 10000);
 /* ---------- 「好机会」模块：xG 实时检测 + 盘口临场追踪 ---------- */
 require('./opportunity').start(store);
 
+/* ---------- ESPN 新闻爬虫：五大联赛球队新闻（舆论报道栏目） ---------- */
+require('./espn-news').start(store);
+
 /* ---------- 真实数据同步（可选，需 FOOTBALL_API_KEY） ---------- */
 const fetcher = require('./fetcher');
 fetcher.start(store);

@@ -123,6 +123,7 @@ class Store {
       color: t.color, color2: t.color2, crest: t.crest, league: t.league,
       formation: t.formation, lineup: t.lineup, recent: t.recent, form: t.form,
       matches: upcoming.map((m) => this._publicMatch(m)),
+      news: t.news || [],
     };
   }
 

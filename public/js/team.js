@@ -109,16 +109,20 @@
       $('#newsList').innerHTML = '<div class="empty-state">暂无舆论数据（免费档 API 未提供）</div>';
       return;
     }
-    $('#newsList').innerHTML = team.news.map((n, i) => `
-      <article class="news-card" style="animation-delay:${i * 50}ms">
+    $('#newsList').innerHTML = team.news.map((n, i) => {
+      const titleHtml = n.link
+        ? `<a class="news-title" href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a>`
+        : `<h3 class="news-title">${esc(n.title)}</h3>`;
+      return `<article class="news-card" style="animation-delay:${i * 50}ms">
         <div class="news-top">
           <span class="news-sentiment ${esc(n.sentiment)}">${sentimentMap[n.sentiment] || '中性'}</span>
           <span class="news-source">${esc(n.source)}</span>
           <span class="news-time">${esc(n.time)}</span>
         </div>
-        <h3 class="news-title">${esc(n.title)}</h3>
+        ${titleHtml}
         <p class="news-summary">${esc(n.summary)}</p>
-      </article>`).join('');
+      </article>`;
+    }).join('');
   }
 
   /* ---------- WS 实时更新 ---------- */
