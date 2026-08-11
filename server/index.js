@@ -141,9 +141,17 @@ require('./opportunity').start(store);
 /* ---------- 新闻聚合：ESPN（15 天内）+ 新浪体育 + 搜狐体育 → 各球队舆论新闻 ---------- */
 require('./cn-news').start(store);
 
-/* ---------- 真实数据同步（可选，需 FOOTBALL_API_KEY） ---------- */
-const fetcher = require('./fetcher');
-fetcher.start(store);
+/* ---------- 2025 调试数据（SEED_2025=1 时启用：跳过真实同步，用 2025 赛季数据填充） ---------- */
+if (process.env.SEED_2025) {
+  const seed = require('./seed-2025');
+  seed.seed(store).then(() => {
+    console.log(`[seed-2025] 调试数据就绪：${store.matches.length} 场比赛 / ${store.teamIndex.size} 支球队`);
+  }).catch((e) => console.log(`[seed-2025] 种子失败: ${e.message}`));
+} else {
+  /* ---------- 真实数据同步（可选，需 FOOTBALL_API_KEY） ---------- */
+  const fetcher = require('./fetcher');
+  fetcher.start(store);
+}
 
 server.listen(PORT, () => {
   console.log(`⚽ Football Pulse 已启动`);

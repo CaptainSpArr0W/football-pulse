@@ -59,6 +59,7 @@ const ALIASES = {
   'deportivoalaves': ['阿拉维斯'],
   'espanyol': ['西班牙人'],
   'bayernmunich': ['拜仁', '拜仁慕尼黑'],
+  'bayernmunchen': ['拜仁', '拜仁慕尼黑'],
   'fcbayernmunchen': ['拜仁', '拜仁慕尼黑'],
   'borussiadortmund': ['多特', '多特蒙德'],
   'bvborussiadortmund': ['多特', '多特蒙德'],
@@ -218,6 +219,7 @@ async function refresh(store) {
         const kws = teamKeywords(t);
         const cnNews = cnItems.filter((n) => kws.some((k) => k && n.title.includes(k)));
         const merged = sortByTime(espnNews.concat(cnNews)).slice(0, 12);
+        if (process.env.SEED_2025 && /拜仁|曼联|阿森纳/.test(t.name)) log(`[debug] ${t.name} kws=[${kws.join('|')}] cn=${cnNews.length} espn=${espnNews.length} merged=${merged.length}`);
         if (merged.length) t.news = merged;
       } catch (_) { /* 单队失败不影响其它 */ }
     }
