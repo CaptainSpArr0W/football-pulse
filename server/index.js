@@ -205,13 +205,27 @@ if (process.env.SEED_2025) {
     const n = require('./understat').applyAll(store);
     if (n > 0) console.log(`[understat] 已填充 xG：${n} 场比赛`);
   }, 20 * 1000);
-  /* The Odds API 赔率：为未开赛五大联赛比赛填充赔率（免费档 500 次/月，每 15 分钟刷新） */
+  /* 赔率策略：早盘(Sofascore) + 临场前15分钟(The Odds API 最后一次读取，节省配额) */
   const oddsApi = require('./odds-api');
+  const sofaOdds = require('./sofascore-odds');
   async function oddsLoop() {
     try {
-      const r = await oddsApi.applyToStore(store);
-      if (r.disabled) return;
-      if (r.filled || r.flagged) console.log(`[odds-api] 赔率已填充 ${r.filled} 场 · 盘口异动 ${r.flagged} 场`);
+      const upcoming = store.matches.filter((m) => m.status === 'upcoming' && oddsApi.LEAGUE_SPORT[m.competition]);
+      if (!upcoming.length) return;
+      const sofaOk = await sofaOdds.probe(); // 每轮探测 Sofascore 可达性（VPN 状态）
+      let filledSofa = 0, filledApi = 0, flagged = 0;
+      for (const m of upcoming) {
+        const kickoff = new Date((m.date + 'T' + (m.time || '00:00')) + 'Z').getTime();
+        const mins = (kickoff - Date.now()) / 60000;
+        if (mins > 15 && sofaOk) {
+          if (await sofaOdds.applyMatch(m, store)) filledSofa++;
+        } else if (mins > 0 && mins <= 15) {
+          if (await oddsApi.applyMatch(m, store)) { filledApi++; if (m.oppHc) flagged++; }
+        }
+      }
+      if (filledSofa || filledApi || flagged) {
+        console.log(`[odds] 早盘(Sofascore) ${filledSofa} 场 · 临场(OddsAPI) ${filledApi} 场 · 异动 ${flagged} 场${sofaOk ? '' : ' · Sofascore 不可达（需 VPN）'}`);
+      }
     } catch (_) { /* 静默降级 */ }
   }
   setTimeout(oddsLoop, 10 * 1000);

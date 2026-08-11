@@ -88,7 +88,29 @@ function mapOdds(g) {
 /* 最近一次各队盘口（用于异动检测：开盘 line → 当前 line） */
 const lastLines = new Map();
 
-/* 为 store 中未开赛比赛填充赔率；返回 { filled, flagged } */
+/* 单场填充（临场/手动调用）；返回 true 表示填充成功 */
+async function applyMatch(m, store) {
+  if (!LEAGUE_SPORT[m.competition]) return false;
+  const games = await fetchLeagueOdds(m.competition);
+  const home = store.teamIndex.get(m.home.id);
+  const away = store.teamIndex.get(m.away.id);
+  if (!home || !away) return false;
+  const g = games.find((x) => nameMatch(x.home_team, home.en || home.name) && nameMatch(x.away_team, away.en || away.name));
+  if (!g) return false;
+  const odds = mapOdds(g);
+  if (!odds.europe.length && !odds.asian.length && !odds.total.length) return false;
+  m.odds = odds;
+  // 盘口异动：亚盘 line 变化 ±0.25+ 即标记
+  const line = odds.asian[0] && odds.asian[0].line;
+  if (line != null) {
+    const prev = lastLines.get(m.id);
+    if (prev != null && Math.abs(line - prev) >= 0.25) m.oppHc = true;
+    lastLines.set(m.id, line);
+  }
+  return true;
+}
+
+/* 为 store 中未开赛比赛填充赔率（兼容旧调用）；返回 { filled, flagged } */
 async function applyToStore(store) {
   if (!config()) return { filled: 0, flagged: 0, disabled: true };
   const upcoming = store.matches.filter((m) => m.status === 'upcoming' && LEAGUE_SPORT[m.competition]);
@@ -96,29 +118,10 @@ async function applyToStore(store) {
   let filled = 0, flagged = 0;
   for (const m of upcoming) {
     try {
-      const games = await fetchLeagueOdds(m.competition);
-      const home = store.teamIndex.get(m.home.id);
-      const away = store.teamIndex.get(m.away.id);
-      if (!home || !away) continue;
-      const g = games.find((x) => nameMatch(x.home_team, home.en || home.name) && nameMatch(x.away_team, away.en || away.name));
-      if (!g) continue;
-      const odds = mapOdds(g);
-      if (!odds.europe.length && !odds.asian.length && !odds.total.length) continue;
-      m.odds = odds;
-      filled++;
-      // 盘口异动：亚盘 line 变化 ±0.25+ 即标记
-      const line = odds.asian[0] && odds.asian[0].line;
-      if (line != null) {
-        const prev = lastLines.get(m.id);
-        if (prev != null && Math.abs(line - prev) >= 0.25) {
-          m.oppHc = true;
-          flagged++;
-        }
-        lastLines.set(m.id, line);
-      }
+      if (await applyMatch(m, store)) { filled++; if (m.oppHc) flagged++; }
     } catch (_) { /* 单个联赛失败不影响其它 */ }
   }
   return { filled, flagged };
 }
 
-module.exports = { applyToStore, fetchLeagueOdds, LEAGUE_SPORT };
+module.exports = { applyToStore, applyMatch, fetchLeagueOdds, LEAGUE_SPORT };

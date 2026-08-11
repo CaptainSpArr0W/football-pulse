@@ -14,7 +14,7 @@
 | 比赛预览 | 点击比赛卡弹出卡片：两队实力分区（ESPN 上赛季积分榜梯队）+ 本场 xG + 近六场进/失球合计 + 首发阵容（实际/预测） |
 | 比赛详情 | 已完赛/直播展示统计与事件；历史交锋 H2H（Fotmob）+ 场地天气 + 双方首发 + 近六场 |
 | xG 数据 | 每场 xG 由 Understat（经 soccerdata 库，含非点球 xG、PPDA）提供，Fotmob 兜底 |
-| 赔率数据 | The Odds API（免费档）提供未来比赛欧赔/亚盘/大小球；可选接入 API-Football 补充滚球与角球盘 |
+| 赔率数据 | 早盘赔率来自 Sofascore（需海外网络）；开赛前 15 分钟临场赔率来自 The Odds API（免费档，节省配额） |
 | 事件流 | 可选接入 API-Football：进球、点球、红黄牌、换人的真实事件时间线 |
 | 球队档案 | 点击任意球队名称进入详情页，查看首发阵容阵型图、近六场真实战绩与球队状态串（队名自动翻译为中文，英文名保留于详情页） |
 | 舆论新闻 | 新闻聚合：ESPN（仅最近 15 天）+ 新浪体育 + 搜狐体育，按球队分类抓取五大联赛各队新闻，自动标注情绪倾向并外链原文 |
@@ -149,7 +149,8 @@ football-pulse/
 │   ├── freefootball.js     # 免费数据源（Fotmob / Sofascore / FBref：积分榜 + 单场补充）
 │   ├── power-rank.js       # 实力分区（ESPN 上赛季积分榜 → S/A/B/C/D/E 梯队）
 │   ├── understat.js        # Understat 每场 xG 数据（soccerdata 抓取，匹配填充比赛 xG）
-│   ├── odds-api.js         # The Odds API 赔率（免费档：欧赔/亚盘/大小球，未来比赛）
+│   ├── odds-api.js         # The Odds API 赔率（临场前15分钟读取：欧赔/亚盘/大小球）
+│   ├── sofascore-odds.js   # Sofascore 早盘赔率（需海外网络；不可达时自动降级不耗配额）
 │   ├── espn-news.js        # ESPN 新闻源（15 天内过滤，供聚合）
 │   ├── cn-news.js          # 国内新闻聚合（新浪体育 + 搜狐体育，按球队关键词分类）
 │   ├── seed-2025.js        # 2025 赛季调试数据（SEED_2025=1 启用，Fotmob 填充）
