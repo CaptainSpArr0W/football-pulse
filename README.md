@@ -75,12 +75,17 @@ npm start       # 启动服务
 | 数据源 | 用途 | 对应开源轮子 |
 |---|---|---|
 | Fotmob（主源） | 积分榜、单场详情（阵容/统计/事件/XG） | [pseudo-r/Public-FotMob-API](https://github.com/pseudo-r/Public-FotMob-API)、[maxencelobry/fotmob](https://github.com/maxencelobry/fotmob) |
-| Sofascore（备源） | 积分榜降级 | [probberechts/soccerdata](https://github.com/probberechts/soccerdata) |
-| FBref（备源） | 积分榜降级（HTML 解析） | [probberechts/soccerdata](https://github.com/probberechts/soccerdata) |
+| Sofascore（备源） | 积分榜降级（WAF 较严，需住宅 IP） | [probberechts/soccerdata](https://github.com/probberechts/soccerdata) |
+| FBref（备源） | 积分榜降级（Playwright 浏览器抓取，绕过 Cloudflare JS 挑战） | [probberechts/soccerdata](https://github.com/probberechts/soccerdata) |
 
 - 实现于 `server/freefootball.js`：三源自动降级（Fotmob → Sofascore → FBref），全部失败时静默隐藏对应区块；
 - 数据经多级缓存（积分榜 6 小时 / 单场 5-30 分钟）；
-- 部分网络（如国内直连）会拦截 Sofascore 与 FBref（403 / Cloudflare 验证），此时自动降级为 Fotmob；部署在海外服务器（如 Render）时三个源均可使用；
+- FBref 使用 **Playwright + 浏览器**抓取（`playwright-core`）：
+  - Windows：自动驱动系统 Edge（`channel: msedge`），无需下载浏览器；
+  - Linux / Render：构建时自动安装 chromium（`render.yaml` 已配置），默认无头模式；
+  - 环境变量 `FBREF_HEADLESS=1` 强制无头，`FBREF_HEADLESS=0` 强制有头；
+  - 能否通过 Cloudflare 挑战取决于出口 IP 信誉：住宅/低风险 IP 一般数秒自动通过，数据中心/机场 IP 可能无限验证（此时该源自动跳过，不影响 Fotmob 主源）；
+- 部分网络（如国内直连）会拦截 Sofascore（403），此时自动降级为 Fotmob；部署在海外服务器（如 Render）时 Fotmob 与 FBref 均可使用；
 - 前端：首页新增「五大联赛积分榜」板块（联赛页签切换）；比赛详情页在 API-Football 数据缺失时自动展示 Fotmob 的阵容/统计/事件/XG。
 
 ## 「好机会」模块（实时机会提示）

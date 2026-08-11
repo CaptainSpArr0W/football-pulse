@@ -35,19 +35,6 @@ async function fetchJson(url, headers, ttlMs, force) {
   return j;
 }
 
-async function fetchText(url, headers, ttlMs, force) {
-  const key = 'free:' + url;
-  if (!force && ttlMs > 0) {
-    const c = httpcache.get(key);
-    if (c !== undefined) return c;
-  }
-  const res = await fetch(url, { headers: headers || UA });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const t = await res.text();
-  if (ttlMs > 0) httpcache.set(key, t, ttlMs);
-  return t;
-}
-
 /* ---------- Fotmob（主源） ---------- */
 
 const FOTMOB = 'https://www.fotmob.com/api/data';
@@ -257,7 +244,7 @@ async function sofascoreStandings(leagueName, force) {
   };
 }
 
-/* ---------- FBref（备源，Cloudflare 验证时自动跳过） ---------- */
+/* ---------- FBref（备源，Playwright 浏览器抓取以通过 Cloudflare JS 挑战） ---------- */
 
 const FBREF = 'https://fbref.com';
 const FBREF_COMPS = { 英超: '9', 西甲: '12', 德甲: '20', 意甲: '11', 法甲: '13' };
@@ -270,18 +257,64 @@ function fbrefSeason() {
   return m >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
 }
 
-/* FBref 积分榜：HTML 表格（th/td 的 data-stat 属性）解析 */
+/* Playwright 浏览器单例：优先系统 Edge（Windows），否则用内置 chromium（Linux 部署需 playwright install chromium） */
+let _browserPromise = null;
+async function fbrefBrowser() {
+  if (_browserPromise) return _browserPromise;
+  _browserPromise = (async () => {
+    const { chromium } = require('playwright-core');
+    const args = ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--disable-gpu'];
+    try {
+      // Windows：驱动系统 Edge，无需下载浏览器
+      return await chromium.launch({ channel: 'msedge', headless: process.env.FBREF_HEADLESS === '1', args });
+    } catch (_) {
+      // Linux（如 Render）：使用 playwright 安装的 chromium
+      return chromium.launch({ headless: process.env.FBREF_HEADLESS !== '0', args });
+    }
+  })().catch((e) => { _browserPromise = null; throw e; });
+  return _browserPromise;
+}
+
+/* 浏览器抓取 FBref 页面：等待 Cloudflare 挑战通过（真实浏览器执行 JS），返回 HTML */
+async function fbrefFetchHtml(url) {
+  let browser;
+  try { browser = await fbrefBrowser(); } catch (_) { return null; }
+  const ctx = await browser.newContext({ locale: 'en-US' });
+  const page = await ctx.newPage();
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    // 等待挑战通过：标题不再是 "Just a moment" 且出现积分榜表格（最多 30s）
+    try {
+      await page.waitForFunction(() => {
+        const t = document.title || '';
+        const hasTable = !!document.querySelector('#div_standings table, table[id^="standings"]');
+        return hasTable || (t.length > 0 && !t.includes('Just a moment'));
+      }, { timeout: 30000 });
+    } catch (_) { return null; }
+    const title = await page.title();
+    if (!title || title.includes('Just a moment')) return null;
+    return await page.content();
+  } catch (_) {
+    return null;
+  } finally {
+    await ctx.close().catch(() => {});
+  }
+}
+
+/* FBref 积分榜：Playwright 抓取 + HTML 表格（data-stat 属性）解析 */
 async function fbrefStandings(leagueName, force) {
   const comp = FBREF_COMPS[leagueName];
   if (!comp) return null;
   const season = fbrefSeason();
   const en = { 英超: 'Premier-League', 西甲: 'La-Liga', 德甲: 'Bundesliga', 意甲: 'Serie-A', 法甲: 'Ligue-1' }[leagueName];
-  const html = await fetchText(`${FBREF}/en/comps/${comp}/${season}/${en}-Stats`, {
-    'user-agent': UA['user-agent'],
-    'accept': 'text/html,application/xhtml+xml',
-    'accept-language': 'en-US,en;q=0.9',
-    'referer': 'https://fbref.com/',
-  }, 6 * 3600 * 1000, force);
+  const url = `${FBREF}/en/comps/${comp}/${season}/${en}-Stats`;
+  const key = 'fbref-pw:' + url;
+  if (!force) {
+    const c = httpcache.get(key);
+    if (c !== undefined) return c;
+  }
+  const html = await fbrefFetchHtml(url);
+  if (!html) return null;
   const $ = cheerio.load(html);
   const table = $('#div_standings table, table#standings, table[id^="standings"]').first();
   if (!table.length) return null;
@@ -309,7 +342,10 @@ async function fbrefStandings(leagueName, force) {
       qualColor: '',
     });
   });
-  return rows.length ? { source: 'fbref', league: leagueName, rows } : null;
+  if (!rows.length) return null;
+  const out = { source: 'fbref', league: leagueName, rows };
+  httpcache.set(key, out, 6 * 3600 * 1000);
+  return out;
 }
 
 /* ---------- 对外聚合 ---------- */

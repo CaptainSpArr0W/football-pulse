@@ -7,12 +7,15 @@ services:
     runtime: node
     plan: free
     autoDeploy: true
-    buildCommand: npm install
+    buildCommand: npm install && (npx playwright-core install chromium --with-deps || npx playwright-core install chromium)
     startCommand: npm start
     envVars:
       # 服务器时区设为北京时区，保证「今天」的比赛日期与国内用户一致
       - key: TZ
         value: Asia/Shanghai
+      # FBref 抓取模式：Linux 上默认无头（无显示服务器）
+      - key: FBREF_HEADLESS
+        value: "1"
       # football-data.org API Key（必填，未配置则站点为空数据）
       # 部署时 Render 会提示你填写
       - key: FOOTBALL_API_KEY
