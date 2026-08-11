@@ -13,6 +13,7 @@
 | 单场数据 | 阵容、比赛统计、事件时间线、XG（API-Football 缺数据时由 Fotmob 免费补充） |
 | 比赛预览 | 点击比赛卡弹出卡片：两队实力分区（ESPN 上赛季积分榜梯队）+ 本场 xG + 近六场进/失球合计 + 首发阵容（实际/预测） |
 | 比赛详情 | 已完赛/直播展示统计与事件；历史交锋 H2H（Fotmob）+ 场地天气 + 双方首发 + 近六场 |
+| xG 数据 | 每场 xG 由 Understat（经 soccerdata 库，含非点球 xG、PPDA）提供，Fotmob 兜底 |
 | 赔率数据 | 可选接入 API-Football：欧赔 / 亚盘 / 大小球 / 角球（赛前与滚球） |
 | 事件流 | 可选接入 API-Football：进球、点球、红黄牌、换人的真实事件时间线 |
 | 球队档案 | 点击任意球队名称进入详情页，查看首发阵容阵型图、近六场真实战绩与球队状态串（队名自动翻译为中文，英文名保留于详情页） |
@@ -147,6 +148,7 @@ football-pulse/
 │   ├── httpcache.js        # 多级 HTTP 缓存（内存 + 磁盘持久化）
 │   ├── freefootball.js     # 免费数据源（Fotmob / Sofascore / FBref：积分榜 + 单场补充）
 │   ├── power-rank.js       # 实力分区（ESPN 上赛季积分榜 → S/A/B/C/D/E 梯队）
+│   ├── understat.js        # Understat 每场 xG 数据（soccerdata 抓取，匹配填充比赛 xG）
 │   ├── espn-news.js        # ESPN 新闻源（15 天内过滤，供聚合）
 │   ├── cn-news.js          # 国内新闻聚合（新浪体育 + 搜狐体育，按球队关键词分类）
 │   ├── seed-2025.js        # 2025 赛季调试数据（SEED_2025=1 启用，Fotmob 填充）

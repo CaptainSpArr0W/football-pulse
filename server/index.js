@@ -192,12 +192,19 @@ require('./cn-news').start(store);
 if (process.env.SEED_2025) {
   const seed = require('./seed-2025');
   seed.seed(store).then(() => {
+    const us = require('./understat').applyAll(store);
     console.log(`[seed-2025] 调试数据就绪：${store.matches.length} 场比赛 / ${store.teamIndex.size} 支球队`);
+    console.log(`[understat] 已填充 xG：${us} 场比赛（Understat 2025/26 数据）`);
   }).catch((e) => console.log(`[seed-2025] 种子失败: ${e.message}`));
 } else {
   /* ---------- 真实数据同步（可选，需 FOOTBALL_API_KEY） ---------- */
   const fetcher = require('./fetcher');
   fetcher.start(store);
+  /* Understat xG 补充：同步完成后为已完赛比赛填充（每 6 小时重试） */
+  setTimeout(() => {
+    const n = require('./understat').applyAll(store);
+    if (n > 0) console.log(`[understat] 已填充 xG：${n} 场比赛`);
+  }, 20 * 1000);
 }
 
 server.listen(PORT, () => {
