@@ -283,7 +283,11 @@ async function fetchRecentFor(store, teamId) {
   const t = store.teamIndex.get(teamId);
   if (!t) return;
   try {
-    const j = await apiCached(`/teams/${teamId}/matches?status=FINISHED&limit=5`, 30 * 60 * 1000);
+    // 当前赛季刚开始时 status=FINISHED 无窗口会返回空，须显式指定历史日期窗口（过去 365 天）
+    const d = new Date(Date.now() + 8 * 3600 * 1000);
+    d.setUTCDate(d.getUTCDate() - 365);
+    const from = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+    const j = await apiCached(`/teams/${teamId}/matches?dateFrom=${from}&dateTo=${todayStr()}&status=FINISHED&limit=5`, 30 * 60 * 1000);
     const list = (j.matches || []).slice(0, 5);
     t.recent = list.map((m) => {
       const home = String(m.homeTeam.id) === teamId;

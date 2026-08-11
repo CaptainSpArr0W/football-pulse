@@ -42,14 +42,26 @@ function fotmobGet(path, ttlMs, force) {
   return fetchJson(FOTMOB + path, UA, ttlMs, force);
 }
 
-/* 积分榜（Fotmob）：table[0].data.table.all 为全部球队行 */
+/* 积分榜（Fotmob）：table[0].data.table.all 为全部球队行；当前赛季未开始（table 空）时回退上一赛季 */
 async function fotmobStandings(leagueName, force) {
   const id = FOTMOB_LEAGUES[leagueName];
   if (!id) return null;
-  const j = await fotmobGet(`/leagues?id=${id}`, 6 * 3600 * 1000, force);
-  const d = j.table && j.table[0] && j.table[0].data;
-  const rows = d && d.table && d.table.all;
-  if (!Array.isArray(rows)) return null;
+  const pickRows = (j) => {
+    const d = j.table && j.table[0] && j.table[0].data;
+    const r = d && d.table && d.table.all;
+    return Array.isArray(r) && r.length ? r : null;
+  };
+  let j = await fotmobGet(`/leagues?id=${id}`, 6 * 3600 * 1000, force);
+  let rows = pickRows(j);
+  if (!rows) {
+    const seasons = (j.allAvailableSeasons || []).map((s) => (typeof s === 'string' ? s : s.name)).filter(Boolean);
+    const prev = seasons[1] || seasons[0];
+    if (prev) {
+      j = await fotmobGet(`/leagues?id=${id}&season=${encodeURIComponent(prev)}`, 6 * 3600 * 1000, force);
+      rows = pickRows(j);
+    }
+  }
+  if (!rows) return null;
   const out = rows.map((r) => {
     const ss = String(r.scoresStr || '').split('-');
     const gf = parseInt(ss[0], 10) || 0;
