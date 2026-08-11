@@ -153,10 +153,16 @@
   }
 
   function liveCard(match) {
-    return `<div class="live-card" id="live-${match.id}" data-match="${match.id}">
+    const oppBadge = match.oppXg
+      ? '<span class="opp-badge opp-xg">⚡ 好机会 · xG异动</span>'
+      : match.oppHc
+        ? '<span class="opp-badge opp-hc">⚡ 好机会 · 盘口异动</span>'
+        : '';
+    return `<div class="live-card${(match.oppXg || match.oppHc) ? ' is-opp' : ''}" id="live-${match.id}" data-match="${match.id}">
       <div class="live-card-top">
         <span class="live-competition">${esc(match.competition)} · ${esc(match.round)}</span>
         <span class="live-minute" data-role="minute">${match.minute != null ? match.minute + '&#39;' : '进行中'}</span>
+        ${oppBadge}
       </div>
       <div class="live-teams">
         <div class="live-team">
@@ -223,6 +229,51 @@
     void el.offsetWidth;
     el.classList.add('score-flash');
     setTimeout(() => el.classList.remove('score-flash'), 750);
+  }
+
+  /* ---------- 好机会模块 ---------- */
+  function oppMatches() {
+    const out = [];
+    for (const d of state.overview.dates || []) {
+      for (const m of state.overview.byDate[d] || []) {
+        if (m.oppXg || m.oppHc) out.push(m);
+      }
+    }
+    return out;
+  }
+  function renderOpp() {
+    const sec = $('#oppSection');
+    const list = oppMatches();
+    sec.hidden = list.length === 0;
+    $('#oppList').innerHTML = list.map((m) => {
+      const tag = m.oppXg
+        ? '<span class="opp-badge opp-xg">xG异动</span>'
+        : '<span class="opp-badge opp-hc">盘口异动</span>';
+      return `<a class="opp-item" href="/match.html?match=${m.id}">
+        ${crestHtml(m.home, 22)} <b>${esc(m.home.name)}</b>
+        <span class="opp-vs">vs</span>
+        <b>${esc(m.away.name)}</b> ${crestHtml(m.away, 22)}
+        <span class="opp-comp">${esc(m.competition)}</span>${tag}</a>`;
+    }).join('');
+  }
+  /* WS：好机会高亮/取消 */
+  function applyOpp(data) {
+    const set = (el, isLive) => {
+      if (!el) return;
+      el.classList.toggle('is-opp', data.on);
+      const old = el.querySelector('.opp-badge');
+      if (old) old.remove();
+      if (data.on) {
+        const badge = document.createElement('span');
+        badge.className = 'opp-badge ' + (data.kind === 'xg' ? 'opp-xg' : 'opp-hc');
+        badge.textContent = data.kind === 'xg' ? '⚡ 好机会 · xG异动' : '⚡ 好机会 · 盘口异动';
+        const box = isLive ? el.querySelector('.live-card-top') : el.querySelector('.match-meta');
+        if (box) box.appendChild(badge);
+      }
+    };
+    set(document.getElementById(`live-${data.matchId}`), true);
+    set(document.querySelector(`[data-match-row="${data.matchId}"]`), false);
+    renderOpp();
   }
 
   /* ---------- 数据刷新（fetcher 同步完成后） ---------- */
@@ -336,6 +387,7 @@
     $('#refreshBtn').addEventListener('click', refreshData);
     loadStandings(false);
     connectWS((data) => {
+      if (data.type === 'opportunity') { applyOpp(data); return; }
       if (data.type === 'data-refreshed') { refetchOverview(); return; }
       applyLiveUpdate(data);
     });
@@ -345,6 +397,7 @@
     renderHead();
     renderMatchList();
     renderLive();
+    renderOpp();
   }
 
   init();

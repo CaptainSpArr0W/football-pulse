@@ -329,6 +329,24 @@ async function standingsAll(force) {
   return out;
 }
 
+/* 实时 xG（Fotmob，优先免费源）：返回 {home, away} 或 null；命中后缓存 Fotmob matchId 到 match._fotmobId */
+async function liveXg(match, force) {
+  let mId = match._fotmobId;
+  if (!mId) {
+    const store = require('./store');
+    const nameOf = (side) => {
+      const t = store.teamIndex.get(match[side].id);
+      return t ? (t.en || t.name || '') : '';
+    };
+    const dateStr = new Date(match.kickoffTs).toISOString().slice(0, 10);
+    mId = await fotmobMatchIdByTeams(dateStr, nameOf('home'), nameOf('away'), force);
+    if (mId) match._fotmobId = mId;
+  }
+  if (!mId) return null;
+  const d = await fotmobMatchDetails(mId, match.status, force);
+  return d.xg;
+}
+
 /* 单场补充：Fotmob 阵容/统计/事件（按日期+队名反查 matchId） */
 async function enrichMatch(match, force) {
   try {
@@ -340,6 +358,7 @@ async function enrichMatch(match, force) {
     const dateStr = new Date(match.kickoffTs).toISOString().slice(0, 10);
     const mId = await fotmobMatchIdByTeams(dateStr, nameOf('home'), nameOf('away'), force);
     if (!mId) return { ok: false, reason: '未在 Fotmob 找到对应比赛' };
+    match._fotmobId = mId;
     const d = await fotmobMatchDetails(mId, match.status, force);
     if (d.lineup) {
       const ht = store.teamIndex.get(match.home.id);
@@ -355,4 +374,4 @@ async function enrichMatch(match, force) {
   }
 }
 
-module.exports = { standingsAll, enrichMatch, fotmobMatchesByDate, fotmobMatchDetails };
+module.exports = { standingsAll, enrichMatch, fotmobMatchesByDate, fotmobMatchDetails, liveXg };

@@ -526,10 +526,22 @@ async function ensureForMatch(match) {
   }
 }
 
+/* 亚盘盘口线（供「好机会」模块追踪开盘→临场波动）；force=true 绕过缓存 */
+async function asianLine(fixtureId, force) {
+  try {
+    const odds = await oddsFor(fixtureId, 'upcoming', force);
+    const asian = odds && odds.asian;
+    return asian && asian[0] ? { line: asian[0].line, bookmaker: asian[0].bookmaker } : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 module.exports = {
   isEnabled,
   syncApifootball,
   ensureForMatch,
+  asianLine,
   usage,
   DAILY_LIMIT: DAILY_LIMIT,
 };

@@ -197,12 +197,18 @@ function matchCard(match, index) {
     : `<span class="match-time">${fmtKick(match.kickoff)}</span>`;
 
   const subOn = isSubscribed(match.id);
-  return `<div class="match-card${isLive ? ' is-live' : ''}" data-match-row="${match.id}" style="animation-delay:${Math.min(index * 45, 360)}ms">
+  const oppBadge = match.oppXg
+    ? '<span class="opp-badge opp-xg">⚡ 好机会 · xG异动</span>'
+    : match.oppHc
+      ? '<span class="opp-badge opp-hc">⚡ 好机会 · 盘口异动</span>'
+      : '';
+  return `<div class="match-card${isLive ? ' is-live' : ''}${(match.oppXg || match.oppHc) ? ' is-opp' : ''}" data-match-row="${match.id}" style="animation-delay:${Math.min(index * 45, 360)}ms">
     <button class="sub-btn${subOn ? ' on' : ''}" data-sub="${match.id}" title="订阅本场比赛">${subOn ? '★' : '☆'}</button>
     <div class="match-meta">
       <span class="match-comp">${esc(match.competition)} · ${esc(match.round)}</span>
       <span class="match-round">${esc(match.date)}</span>
       ${statusHtml}
+      ${oppBadge}
     </div>
     <div class="match-teams">
       <div class="match-team">
