@@ -81,6 +81,8 @@ class Store {
       halfReport: m.halfReport || null,
       odds: m.odds || { europe: [], asian: [], total: [], corners: [] },
       events: (m.events || []).slice(-8),
+      h2h: m.h2h || null,
+      weather: m.weather || null,
       oppXg: m.oppXg || false,
       oppHc: m.oppHc || false,
     };

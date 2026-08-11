@@ -212,8 +212,6 @@ ul { list-style: none; }
 }
 .xg-bar.home { left: 0; background: linear-gradient(90deg, var(--brand-2), var(--brand)); }
 .xg-bar.away { right: 0; background: linear-gradient(270deg, #3a4552, #64707e); }
-.xg-bar.xga.home { background: linear-gradient(90deg, #2e7d32, #66bb6a); }
-.xg-bar.xga.away { background: linear-gradient(270deg, #8e24aa, #ba68c8); }
 .xg-divider { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--card); }
 
 /* 事件流 */
@@ -512,6 +510,32 @@ a.news-title:hover { color: var(--brand); text-decoration: underline; }
 .pv-foot { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px dashed var(--line); padding-top: 10px; }
 .pv-detail-btn { display: inline-flex; align-items: center; gap: 4px; background: var(--brand); color: #fff; font-size: 12.5px; font-weight: 700; padding: 7px 14px; border-radius: 8px; text-decoration: none; }
 .pv-detail-btn:hover { opacity: .88; }
+
+/* ---------- 历史交锋 ---------- */
+.h2h-card { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: var(--bg-soft); }
+.h2h-summary { display: flex; justify-content: center; gap: 26px; margin-bottom: 12px; }
+.h2h-sum-item { font-size: 12.5px; color: var(--ink-3); display: flex; align-items: baseline; gap: 5px; }
+.h2h-sum-item b { font-size: 18px; color: var(--ink); }
+.h2h-sum-item.home b { color: var(--brand); }
+.h2h-sum-item.away b { color: #64707e; }
+.h2h-list { display: flex; flex-direction: column; gap: 6px; }
+.h2h-row { display: grid; grid-template-columns: 92px 1fr 52px 1fr 120px; align-items: center; gap: 8px; font-size: 12.5px; padding: 5px 8px; border-radius: 8px; background: var(--bg); }
+.h2h-date { color: var(--ink-3); }
+.h2h-home { text-align: right; color: var(--ink-2); }
+.h2h-score { text-align: center; font-weight: 700; color: var(--ink); }
+.h2h-away { color: var(--ink-2); }
+.h2h-comp { color: var(--ink-3); font-size: 11px; text-align: right; }
+
+/* ---------- 比赛信息（天气） ---------- */
+.match-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.match-info-item { border: 1px solid var(--line); background: var(--bg-soft); border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; gap: 4px; }
+.mi-key { font-size: 11.5px; color: var(--ink-3); }
+.match-info-item b { font-size: 15px; color: var(--ink); }
+
+/* ---------- 五大联赛球员榜 ---------- */
+.topscorers-type { display: flex; gap: 8px; margin-bottom: 12px; }
+.ts-type-btn { border: 1px solid var(--line); background: var(--bg-soft); color: var(--ink-2); font-size: 12.5px; padding: 6px 14px; border-radius: 999px; cursor: pointer; transition: all .15s; }
+.ts-type-btn.active { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
 
 /* ---------- 页脚 ---------- */
 .site-footer { border-top: 1px solid var(--line); margin-top: 50px; padding: 22px 0; }

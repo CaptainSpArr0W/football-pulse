@@ -93,15 +93,13 @@
     </div>`;
   }
 
-  /* xG 与预期失球（本场）：预期失球 = 对方本场 xG */
+  /* 本场 xG */
   function xgHtml(m, side) {
     const hasXg = m.xg && (Number(m.xg.home) > 0 || Number(m.xg.away) > 0);
     if (!hasXg) return `<div class="pv-cell pv-empty">暂无 xG 数据</div>`;
     const mine = Number(m.xg[side]);
-    const opp = Number(m.xg[side === 'home' ? 'away' : 'home']);
     return `<div class="pv-cell pv-xg">
       <div class="pv-xg-item"><span class="pv-xg-label">xG 预期进球</span><b>${mine.toFixed(2)}</b></div>
-      <div class="pv-xg-item"><span class="pv-xg-label">预期失球</span><b>${opp.toFixed(2)}</b></div>
     </div>`;
   }
 
@@ -132,7 +130,7 @@
         </div>
       </div>
       ${section('实力分区', '基于上赛季联赛排名（ESPN）', powerHtml('home', data.power.home), powerHtml('away', data.power.away))}
-      ${section('xG 与预期失球', '本场 xG · 预期失球 = 对方 xG（Fotmob）', xgHtml(m, 'home'), xgHtml(m, 'away'))}
+      ${section('xG', '本场预期进球（Fotmob）', xgHtml(m, 'home'), xgHtml(m, 'away'))}
       ${section('近六场综合', '两队在各自联赛近六场进/失球合计', formHtml(data.form.home), formHtml(data.form.away))}
       ${section('首发阵容', lineupNote, lineupHtml(m.homeTeam, data.lineups.home), lineupHtml(m.awayTeam, data.lineups.away))}
       <div class="pv-foot">

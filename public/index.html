@@ -94,6 +94,23 @@
       </div>
     </section>
 
+    <!-- 五大联赛射手榜/助攻榜（Sofascore，需海外网络） -->
+    <section class="topscorers-section" id="topscorersSection" hidden>
+      <div class="section-title">
+        <h2>五大联赛球员榜</h2>
+        <span class="section-note">数据来源 Sofascore · 每 12 小时更新 · 需海外网络</span>
+      </div>
+      <div class="standings-tabs" id="topscorersTabs"></div>
+      <div class="topscorers-type" id="topscorersType">
+        <button class="ts-type-btn active" data-stat="goals">射手榜</button>
+        <button class="ts-type-btn" data-stat="assists">助攻榜</button>
+        <button class="ts-type-btn" data-stat="rating">评分榜</button>
+      </div>
+      <div class="standings-wrap" id="topscorersWrap">
+        <p class="empty-state">球员榜加载中…</p>
+      </div>
+    </section>
+
   </main>
 
   <footer class="site-footer">

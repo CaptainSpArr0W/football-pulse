@@ -79,10 +79,6 @@
 
   function renderHeroXg(m) {
     const total = m.xg.home + m.xg.away || 1;
-    /* 预期失球 = 对方本场 xG */
-    const xgaHome = m.xg.away;
-    const xgaAway = m.xg.home;
-    const xgaTotal = xgaHome + xgaAway || 1;
     $('#heroXg').innerHTML = `<div class="xg-row">
       <span class="xg-tag home-tag" data-role="xgh">${m.xg.home.toFixed(2)}</span>
       <div class="xg-track">
@@ -92,17 +88,7 @@
       </div>
       <span class="xg-tag away-tag" data-role="xga">${m.xg.away.toFixed(2)}</span>
     </div>
-    <div class="xg-caption">预期进球 XG · ${m.status === 'live' ? '实时更新' : '全场数据'}</div>
-    <div class="xg-row xga-row">
-      <span class="xg-tag home-tag">${xgaHome.toFixed(2)}</span>
-      <div class="xg-track">
-        <div class="xg-bar xga home" style="width:${((xgaHome / xgaTotal) * 100).toFixed(1)}%"></div>
-        <div class="xg-bar xga away" style="width:${((xgaAway / xgaTotal) * 100).toFixed(1)}%"></div>
-        <div class="xg-divider"></div>
-      </div>
-      <span class="xg-tag away-tag">${xgaAway.toFixed(2)}</span>
-    </div>
-    <div class="xg-caption">预期失球 XGA（= 对方 XG）</div>`;
+    <div class="xg-caption">预期进球 XG · ${m.status === 'live' ? '实时更新' : '全场数据'}</div>`;
   }
 
   /* ---------- 实时统计 ---------- */
@@ -288,8 +274,13 @@
     current = match;
     document.title = `${match.home.name} vs ${match.away.name} · 足球脉动`;
     renderHero(match);
-    $('#liveDataSection').hidden = match.status !== 'live';
-    if (match.status === 'live') {
+    /* 已开赛或完赛均展示统计/事件（未开赛隐藏） */
+    $('#liveDataSection').hidden = match.status === 'upcoming';
+    const ldTitle = $('#liveDataSection').querySelector('.section-title h2');
+    if (ldTitle) ldTitle.innerHTML = match.status === 'live'
+      ? '<span class="live-dot" aria-hidden="true"></span>实时数据'
+      : '比赛数据';
+    if (match.status !== 'upcoming') {
       renderStats(match);
       renderEvents(match);
       renderHalfReport(match);
@@ -297,6 +288,50 @@
     renderOdds(match);
     renderLineups(match);
     renderRecent(match);
+    renderH2h(match);
+    renderMatchInfo(match);
+  }
+
+  /* ---------- 历史交锋 ---------- */
+  function renderH2h(m) {
+    const section = $('#h2hSection');
+    const wrap = $('#h2hWrap');
+    if (!m.h2h || !m.h2h.matches || !m.h2h.matches.length) { section.hidden = true; return; }
+    section.hidden = false;
+    const [hw, hd, hl] = m.h2h.summary || [0, 0, 0];
+    const sumHtml = m.h2h.summary
+      ? `<div class="h2h-summary">
+          <span class="h2h-sum-item home"><b>${hw}</b> 主队胜</span>
+          <span class="h2h-sum-item draw"><b>${hd}</b> 平局</span>
+          <span class="h2h-sum-item away"><b>${hl}</b> 客队胜</span>
+        </div>`
+      : '';
+    const rows = m.h2h.matches.map((r) => `
+      <div class="h2h-row">
+        <span class="h2h-date">${esc(r.date)}</span>
+        <span class="h2h-home">${esc(r.home)}</span>
+        <span class="h2h-score">${esc(r.score)}</span>
+        <span class="h2h-away">${esc(r.away)}</span>
+        <span class="h2h-comp">${esc(r.competition)}</span>
+      </div>`).join('');
+    wrap.innerHTML = sumHtml + `<div class="h2h-list">${rows}</div>`;
+  }
+
+  /* ---------- 比赛信息（天气） ---------- */
+  function renderMatchInfo(m) {
+    const section = $('#matchInfoSection');
+    const wrap = $('#matchInfoWrap');
+    if (!m.weather) { section.hidden = true; return; }
+    section.hidden = false;
+    const w = m.weather;
+    const items = [
+      ['天气', w.desc],
+      ['温度', w.temp != null ? w.temp + '℃' : null],
+      ['湿度', w.humidity != null ? w.humidity + '%' : null],
+      ['风速', w.wind != null ? w.wind + ' km/h ' + (w.windDir || '') : null],
+    ].filter((x) => x[1] != null);
+    wrap.innerHTML = `<div class="match-info-grid">${items.map(([k, v]) => `
+      <div class="match-info-item"><span class="mi-key">${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div>`;
   }
 
   async function init() {

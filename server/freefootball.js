@@ -103,7 +103,7 @@ async function fotmobMatchesByDate(dateStr, force) {
   return out;
 }
 
-/* 单场详情（Fotmob）：阵容 / 统计 / 事件 */
+/* 单场详情（Fotmob）：阵容 / 统计 / 事件 / 历史交锋 / 天气 */
 async function fotmobMatchDetails(matchId, status, force) {
   const ttl = status === 'live' ? 5 * 60 * 1000 : 30 * 60 * 1000;
   const j = await fotmobGet(`/matchDetails?matchId=${matchId}`, ttl, force);
@@ -116,6 +116,33 @@ async function fotmobMatchDetails(matchId, status, force) {
     lineup: mapFotmobLineup(c.lineup),
     events: mapFotmobEvents(c.matchFacts),
     xg,
+    h2h: mapFotmobH2h(c.h2h),
+    weather: c.weather
+      ? {
+        temp: c.weather.temperature,
+        wind: c.weather.windSpeed,
+        windDir: c.weather.windDirectionCardinal,
+        humidity: c.weather.relativeHumidity,
+        desc: c.weather.description || c.weather.defaultTitle || '',
+      }
+      : null,
+  };
+}
+
+/* Fotmob 历史交锋 → 站点格式（summary: [主胜, 平, 客胜]） */
+function mapFotmobH2h(h) {
+  if (!h || !h.matches) return null;
+  const mlist = Array.isArray(h.matches) ? h.matches : [];
+  return {
+    summary: Array.isArray(h.summary) ? h.summary : null,
+    total: h.total || mlist.length,
+    matches: mlist.slice(0, 5).map((m) => ({
+      date: ((m.time && m.time.utcTime) || '').slice(0, 10),
+      competition: (m.league && m.league.name) || '',
+      home: (m.home && m.home.name) || '',
+      away: (m.away && m.away.name) || '',
+      score: (m.status && m.status.scoreStr) || '',
+    })),
   };
 }
 
@@ -516,6 +543,8 @@ async function enrichMatch(match, force) {
     if (d.stats && !match.stats) match.stats = d.stats;
     if (d.events && !match.events.length) match.events = d.events;
     if (d.xg && (d.xg.home > 0 || d.xg.away > 0)) match.xg = d.xg;
+    if (d.h2h) match.h2h = d.h2h;
+    if (d.weather) match.weather = d.weather;
     return { ok: true, ...d };
   } catch (err) {
     return { ok: false, reason: err.message };
