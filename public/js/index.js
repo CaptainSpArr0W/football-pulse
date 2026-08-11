@@ -237,6 +237,45 @@
     } catch (_) { /* 保留当前视图 */ }
   }
 
+  /* ---------- 手动刷新 ---------- */
+  let refreshing = false;
+  let refreshCoolDown = 0;
+  async function refreshData() {
+    const btn = $('#refreshBtn');
+    const txt = $('#refreshTxt');
+    if (refreshing) return;
+    if (Date.now() < refreshCoolDown) {
+      txt.textContent = '操作太频繁';
+      setTimeout(() => { txt.textContent = '刷新'; }, 1500);
+      return;
+    }
+    refreshing = true;
+    btn.disabled = true;
+    btn.classList.add('spinning');
+    txt.textContent = '刷新中…';
+    try {
+      const res = await fetch('/api/refresh', { method: 'POST' });
+      if (res.status === 409) {
+        txt.textContent = '同步中，稍候';
+      } else if (res.ok) {
+        const r = await res.json();
+        txt.textContent = `已更新 ${r.updated} 场`;
+        await refetchOverview();
+        renderDateNav();
+        renderFilters();
+        renderSelect();
+        refreshCoolDown = Date.now() + 30 * 1000;
+      } else {
+        txt.textContent = '刷新失败';
+      }
+    } catch (_) {
+      txt.textContent = '网络错误';
+    }
+    btn.classList.remove('spinning');
+    btn.disabled = false;
+    setTimeout(() => { txt.textContent = '刷新'; }, 2500);
+  }
+
   /* ---------- 初始化 ---------- */
   async function init() {
     try {
@@ -251,6 +290,7 @@
     renderFilters();
     renderSelect();
     render();
+    $('#refreshBtn').addEventListener('click', refreshData);
     connectWS((data) => {
       if (data.type === 'data-refreshed') { refetchOverview(); return; }
       applyLiveUpdate(data);

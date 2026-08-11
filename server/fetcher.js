@@ -30,8 +30,16 @@ function loadConfig() {
   }
 }
 const CONFIG = loadConfig();
-const KEY = process.env.FOOTBALL_API_KEY || CONFIG.key || '';
+/* 多 Key：环境变量 > 配置文件 keys 数组 > 配置文件 key（向后兼容），自动去重 */
+const KEY_CONFIG = [...new Set([
+  process.env.FOOTBALL_API_KEY,
+  ...(CONFIG.keys || []),
+  CONFIG.key,
+].filter(Boolean))];
+const KEY_STATES = KEY_CONFIG.map((k) => ({ key: k, lastCallAt: 0, cooldownUntil: 0 }));
+let rrIndex = 0;
 const INTERVAL_MS = Math.max(1, Number(process.env.SYNC_INTERVAL_MIN || CONFIG.intervalMin || 5)) * 60 * 1000;
+const httpcache = require('./httpcache');
 
 const NAME_BY_CODE = CODES;
 
@@ -64,22 +72,28 @@ function colorFor(id) {
 
 function log(msg) { console.log(`[fetcher] ${msg}`); }
 
-/* 限流队列：免费档 10 次/分钟，这里留 6 秒间隔余量 */
-let lastCallAt = 0;
-async function throttled(fn) {
-  const wait = Math.max(0, 6000 - (Date.now() - lastCallAt));
+/* 限流队列：多 Key 轮转，每 Key 6 秒间隔余量；429 时该 Key 冷却 60 秒 */
+async function api(pathname) {
+  const now = Date.now();
+  const avail = KEY_STATES.filter((k) => now >= k.cooldownUntil);
+  const ks = avail.length ? avail[rrIndex++ % avail.length] : (KEY_STATES[0] || null);
+  if (!ks) throw new Error('未配置 football-data token');
+  const wait = Math.max(0, 6000 - (Date.now() - ks.lastCallAt));
   if (wait) await new Promise((r) => setTimeout(r, wait));
-  lastCallAt = Date.now();
-  return fn();
+  ks.lastCallAt = Date.now();
+  const res = await fetch(BASE + pathname, { headers: { 'X-Auth-Token': ks.key } });
+  if (res.status === 429) { ks.cooldownUntil = Date.now() + 60 * 1000; throw new Error('请求超限(429)，稍后自动重试'); }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
-async function api(pathname) {
-  return throttled(async () => {
-    const res = await fetch(BASE + pathname, { headers: { 'X-Auth-Token': KEY } });
-    if (res.status === 429) throw new Error('请求超限(429)，稍后自动重试');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  });
+/* 带多级缓存（内存/磁盘）的请求：TTL 内不重复调取 */
+async function apiCached(pathname, ttlMs) {
+  const cached = httpcache.get(pathname);
+  if (cached !== undefined) return cached;
+  const j = await api(pathname);
+  httpcache.set(pathname, j, ttlMs);
+  return j;
 }
 
 /* v4 比赛状态 → 项目状态 */
@@ -243,7 +257,7 @@ function buildLineupFromApi(startingXI, formation) {
 async function fetchLineupsFor(store, m) {
   if (m._lineupFetched) return;
   try {
-    const lu = await api(`/matches/${m.apiId}/lineups`);
+    const lu = await apiCached(`/matches/${m.apiId}/lineups`, 6 * 3600 * 1000);
     const build = (side) => (side && Array.isArray(side.startingXI) && side.startingXI.length
       ? buildLineupFromApi(side.startingXI, side.formation)
       : null);
@@ -269,7 +283,7 @@ async function fetchRecentFor(store, teamId) {
   const t = store.teamIndex.get(teamId);
   if (!t) return;
   try {
-    const j = await api(`/teams/${teamId}/matches?status=FINISHED&limit=5`);
+    const j = await apiCached(`/teams/${teamId}/matches?status=FINISHED&limit=5`, 30 * 60 * 1000);
     const list = (j.matches || []).slice(0, 5);
     t.recent = list.map((m) => {
       const home = String(m.homeTeam.id) === teamId;
@@ -314,8 +328,12 @@ function pushUpdate(store, match) {
 
 /* ---------- 主循环 ---------- */
 
-async function syncOnce(store) {
-  if (!KEY) return { ok: false, reason: 'no-key' };
+let syncing = false; // 防止定时同步与手动刷新并发
+
+async function syncOnce(store, opts = {}) {
+  if (!KEY_CONFIG.length) return { ok: false, reason: 'no-key' };
+  if (syncing) return { ok: false, reason: 'busy' };
+  syncing = true;
   try {
     const off = (n) => {
       const d = new Date(Date.now() + 8 * 3600 * 1000);
@@ -330,14 +348,14 @@ async function syncOnce(store) {
       if (m) changed.push(m);
     }
 
-    // 直播/已完场：同步首发阵容（每场一次，限流）
+    // 直播/已完场：同步首发阵容（每场一次，6 小时多级缓存）
     for (const m of store.matches) {
       if ((m.status === 'live' || m.status === 'finished') && !m._lineupFetched) {
         await fetchLineupsFor(store, m);
       }
     }
 
-    // 窗口内涉及球队：同步近六场（每轮最多 10 支，30 分钟缓存，多轮循环覆盖全部）
+    // 窗口内涉及球队：同步近六场（每轮最多 10 支，30 分钟多级缓存，多轮循环覆盖全部）
     const involved = new Set();
     for (const m of store.matches) { involved.add(m.home.id); involved.add(m.away.id); }
     let n = 0;
@@ -351,31 +369,34 @@ async function syncOnce(store) {
 
     for (const m of changed) pushUpdate(store, m);
 
-    // API-Football 补充：赔率 + 真实事件流（免费档按需 + 缓存）
+    // API-Football 补充：赔率 + 真实事件流（免费档按需 + 多级缓存；手动刷新可绕过赔率缓存）
+    let evChanged = [];
     const apiFb = require('./apifootball');
     if (apiFb.isEnabled()) {
-      const evChanged = await apiFb.syncApifootball(store);
+      evChanged = await apiFb.syncApifootball(store, { forceOdds: !!opts.forceOdds });
       for (const m of evChanged) pushUpdate(store, m);
     }
 
     store.broadcast({ type: 'data-refreshed', at: Date.now(), matches: store.matches.length });
     log(`同步完成：接口 ${fixtures.length} 场，更新 ${changed.length} 场，球队 ${store.teamIndex.size} 支`);
-    return { ok: true, updated: changed.length };
+    return { ok: true, updated: changed.length + evChanged.length };
   } catch (err) {
     log(`同步失败，保持现有数据：${err.message}`);
     return { ok: false, reason: err.message };
+  } finally {
+    syncing = false;
   }
 }
 
 let timer = null;
 
 function start(store) {
-  if (!KEY) {
+  if (!KEY_CONFIG.length) {
     log('未配置 football-data token，站点将保持空数据。');
     log('设置环境变量 FOOTBALL_API_KEY 或写入 server/data/api-config.json 后重启即可启用。');
     return;
   }
-  log(`已启用真实数据同步（football-data.org，间隔 ${INTERVAL_MS / 60000} 分钟）`);
+  log(`已启用真实数据同步（football-data.org，${KEY_CONFIG.length} 个 Key，间隔 ${INTERVAL_MS / 60000} 分钟）`);
   syncOnce(store);
   timer = setInterval(() => syncOnce(store), INTERVAL_MS);
   timer.unref && timer.unref();

@@ -1,4 +1,5 @@
 {
   "key": "your-football-data.org-api-key",
+  "keys": ["your-second-key", "your-third-key"],
   "intervalMin": 5
 }

@@ -64,6 +64,15 @@ app.get('/api/match/:id', async (req, res) => {
   res.json({ match: store.matchById(req.params.id) });
 });
 
+/* 手动刷新：立即同步最新赛程/比分/赔率（绕过赔率缓存；与定时同步互斥） */
+app.post('/api/refresh', async (req, res) => {
+  const fetcher = require('./fetcher');
+  const r = await fetcher.syncOnce(store, { forceOdds: true });
+  if (!r.ok) return res.status(r.reason === 'busy' ? 409 : 502).json(r);
+  const apiFb = require('./apifootball');
+  res.json({ ok: true, updated: r.updated, usage: apiFb.usage(), matches: store.matches.length });
+});
+
 /* ---------- HTTP 服务器 ---------- */
 const server = http.createServer(app);
 

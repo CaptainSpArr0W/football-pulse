@@ -1,3 +1,4 @@
 {
-  "key": "your-api-football-key"
+  "key": "your-api-football-key",
+  "keys": ["your-second-key", "your-third-key"]
 }
