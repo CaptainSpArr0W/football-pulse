@@ -470,19 +470,19 @@ async function syncApifootball(store) {
     const today = bjToday();
     await attachFixtureIds(store);
 
-    // 今日比赛赔率（30 分钟缓存；直播中 5 分钟；额外联赛按需拉取不占后台配额）
+    // 今日比赛赔率（30 分钟缓存；直播中 5 分钟）
     for (const m of store.matches) {
-      if (m.date !== today || !m.apiFixtureId || m._extra) continue;
+      if (m.date !== today || !m.apiFixtureId) continue;
       try {
         const odds = await oddsFor(m.apiFixtureId, m.status);
         if (odds) m.odds = odds;
       } catch (err) { log(`赔率失败 ${m.id}：${err.message}`); }
     }
 
-    // 直播/已完场事件（5 分钟 / 6 小时缓存，缓存即限流；额外联赛按需拉取）
+    // 直播/已完场事件（5 分钟 / 6 小时缓存，缓存即限流）
     const changed = [];
     for (const m of store.matches) {
-      if (!m.apiFixtureId || m._extra || (m.status !== 'live' && m.status !== 'finished')) continue;
+      if (!m.apiFixtureId || (m.status !== 'live' && m.status !== 'finished')) continue;
       try {
         const raw = await eventsFor(m.apiFixtureId, m.status);
         const events = finalizeEvents(m, raw);

@@ -88,6 +88,8 @@
   function renderSelect() {
     const sel = $('#compSelect');
     const others = (state.overview.competitions || []).filter((c) => !BIG_FIVE.includes(c));
+    // 仅有五大联赛时隐藏"更多联赛"下拉
+    sel.style.display = others.length ? '' : 'none';
     sel.innerHTML = '<option value="">更多联赛</option>' +
       others.map((c) => `<option value="${esc(c)}"${state.selectedComp === c ? ' selected' : ''}>${esc(c)}</option>`).join('');
     sel.onchange = () => {
