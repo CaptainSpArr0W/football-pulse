@@ -9,6 +9,7 @@
 const cheerio = require('cheerio');
 const httpcache = require('./httpcache');
 const espn = require('./espn-news');
+const translate = require('./translate');
 
 const BIG_FIVE = ['英超', '西甲', '德甲', '意甲', '法甲'];
 const UA = {
@@ -220,7 +221,7 @@ async function refresh(store) {
         const cnNews = cnItems.filter((n) => kws.some((k) => k && n.title.includes(k)));
         const merged = sortByTime(espnNews.concat(cnNews)).slice(0, 12);
         if (process.env.SEED_2025 && /拜仁|曼联|阿森纳/.test(t.name)) log(`[debug] ${t.name} kws=[${kws.join('|')}] cn=${cnNews.length} espn=${espnNews.length} merged=${merged.length}`);
-        if (merged.length) t.news = merged;
+        if (merged.length) t.news = await translate.translateNews(merged);
       } catch (_) { /* 单队失败不影响其它 */ }
     }
   };
