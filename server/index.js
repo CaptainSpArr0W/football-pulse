@@ -205,31 +205,47 @@ if (process.env.SEED_2025) {
     const n = require('./understat').applyAll(store);
     if (n > 0) console.log(`[understat] 已填充 xG：${n} 场比赛`);
   }, 20 * 1000);
-  /* 赔率策略：早盘(Sofascore) + 临场前15分钟(The Odds API 最后一次读取，节省配额) */
+  /* 赔率策略（The Odds API 低频轮询，节省配额）：
+   * - 早盘：每天 09:00 固定一轮，为当日未开赛五大联赛比赛填充赔率（5 次请求）
+   * - 临场：开赛前 ≤15 分钟时读取（每联赛 6 小时冷却，每天每联赛至多 2 次）
+   * - 配额保护：每日硬上限 20 次，超限自动跳过本轮 */
   const oddsApi = require('./odds-api');
-  const sofaOdds = require('./sofascore-odds');
+  const dayUsed = { date: '', count: 0 };
+  let earlyRoundKey = '';
+  const apiCool = {};
+  const DAILY_CAP = 20;
+  const EARLY_HOUR = 9;
   async function oddsLoop() {
     try {
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      if (dayUsed.date !== today) { dayUsed.date = today; dayUsed.count = 0; }
       const upcoming = store.matches.filter((m) => m.status === 'upcoming' && oddsApi.LEAGUE_SPORT[m.competition]);
       if (!upcoming.length) return;
-      const sofaOk = await sofaOdds.probe(); // 每轮探测 Sofascore 可达性（VPN 状态）
-      let filledSofa = 0, filledApi = 0, flagged = 0;
+      const isEarly = now.getHours() === EARLY_HOUR && now.getMinutes() < 40 && earlyRoundKey !== today;
+      const targets = new Set();
       for (const m of upcoming) {
-        const kickoff = new Date((m.date + 'T' + (m.time || '00:00')) + 'Z').getTime();
-        const mins = (kickoff - Date.now()) / 60000;
-        if (mins > 15 && sofaOk) {
-          if (await sofaOdds.applyMatch(m, store)) filledSofa++;
-        } else if (mins > 0 && mins <= 15) {
-          if (await oddsApi.applyMatch(m, store)) { filledApi++; if (m.oppHc) flagged++; }
+        const mins = (new Date(m.date + 'T' + (m.time || '00:00') + 'Z') - now) / 60000;
+        if (isEarly && mins > 15) targets.add(m.competition);
+        else if (mins > 0 && mins <= 15) targets.add(m.competition);
+      }
+      let filled = 0, flagged = 0;
+      for (const lg of targets) {
+        if (dayUsed.count >= DAILY_CAP) break;
+        const since = apiCool[lg] || 0;
+        if (now - since < 6 * 3600 * 1000) continue;
+        apiCool[lg] = now.getTime();
+        dayUsed.count++;
+        for (const m of upcoming.filter((x) => x.competition === lg)) {
+          try { if (await oddsApi.applyMatch(m, store)) { filled++; if (m.oppHc) flagged++; } } catch (_) {}
         }
       }
-      if (filledSofa || filledApi || flagged) {
-        console.log(`[odds] 早盘(Sofascore) ${filledSofa} 场 · 临场(OddsAPI) ${filledApi} 场 · 异动 ${flagged} 场${sofaOk ? '' : ' · Sofascore 不可达（需 VPN）'}`);
-      }
+      if (isEarly) earlyRoundKey = today;
+      if (filled || flagged) console.log(`[odds] The Odds API 填充 ${filled} 场 · 异动 ${flagged} 场 · 今日已用 ${dayUsed.count}/${DAILY_CAP} · 本月剩余 ${oddsApi.quotaLeft() || '?'} 次`);
     } catch (_) { /* 静默降级 */ }
   }
   setTimeout(oddsLoop, 10 * 1000);
-  setInterval(oddsLoop, 15 * 60 * 1000);
+  setInterval(oddsLoop, 5 * 60 * 1000);
 }
 
 server.listen(PORT, () => {

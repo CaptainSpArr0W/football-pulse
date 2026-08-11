@@ -18,6 +18,8 @@ const LEAGUE_SPORT = {
 };
 
 let KEY = '';
+let remaining = null; // 本月剩余配额（x-requests-remaining）
+function quotaLeft() { return remaining; }
 function config() {
   if (KEY) return KEY;
   try {
@@ -44,6 +46,8 @@ async function fetchLeagueOdds(league) {
   if (cached !== undefined) return cached;
   const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${config()}&regions=eu&markets=h2h,totals,spreads&oddsFormat=decimal`;
   const res = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' } });
+  const rem = res.headers.get('x-requests-remaining');
+  if (rem) remaining = rem;
   if (!res.ok) throw new Error(`odds-api HTTP ${res.status}`);
   const j = await res.json();
   httpcache.set(key, j, 10 * 60 * 1000);
@@ -124,4 +128,4 @@ async function applyToStore(store) {
   return { filled, flagged };
 }
 
-module.exports = { applyToStore, applyMatch, fetchLeagueOdds, LEAGUE_SPORT };
+module.exports = { applyToStore, applyMatch, fetchLeagueOdds, quotaLeft, LEAGUE_SPORT };
