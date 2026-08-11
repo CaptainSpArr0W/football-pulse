@@ -621,6 +621,36 @@ img.crest, img.crest-big { object-fit: cover; }
 .refresh-btn.spinning .refresh-ico { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ---------- 五大联赛积分榜 ---------- */
+.standings-section { margin-top: 34px; }
+.standings-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.standings-tab {
+  padding: 6px 15px; font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--ink-2); background: transparent;
+  border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer;
+  transition: all 0.15s ease;
+}
+.standings-tab:hover { color: var(--brand); border-color: var(--brand); }
+.standings-tab.active { color: #fff; background: var(--brand); border-color: var(--brand); }
+.standings-wrap { overflow-x: auto; }
+.standings-table {
+  width: 100%; border-collapse: collapse; font-size: 12.5px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+}
+.standings-table th, .standings-table td { padding: 7px 10px; text-align: center; white-space: nowrap; }
+.standings-table thead th {
+  font-size: 11px; font-weight: 700; color: var(--ink-3); letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--line); background: var(--bg-soft);
+}
+.standings-table tbody tr { border-bottom: 1px solid var(--line); }
+.standings-table tbody tr:last-child { border-bottom: none; }
+.standings-table tbody tr:hover { background: var(--bg-soft); }
+.standings-table .st-rank { color: var(--ink-3); font-weight: 600; }
+.standings-table .st-team { text-align: left; font-weight: 600; }
+.standings-table .st-gd { color: var(--ink-2); }
+.standings-table .st-pts { font-weight: 800; color: var(--brand); }
+.standings-note { margin-top: 8px; font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.5px; }
+
 /* ---------- 动画 ---------- */
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(8px); }

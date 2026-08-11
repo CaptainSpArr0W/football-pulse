@@ -8,6 +8,8 @@
 | --- | --- |
 | 赛程一览 | 按日期（昨天 / 今天 / 未来 5 天）与赛事分类筛选，覆盖五大联赛（英超、西甲、德甲、意甲、法甲） |
 | 实时比分 | 进行中的比赛实时推送比分与比赛分钟（WebSocket） |
+| 五大联赛积分榜 | 免费源实时积分榜（Fotmob 主源，Sofascore / FBref 备源降级） |
+| 单场数据 | 阵容、比赛统计、事件时间线、XG（API-Football 缺数据时由 Fotmob 免费补充） |
 | 赔率数据 | 可选接入 API-Football：欧赔 / 亚盘 / 大小球 / 角球（赛前与滚球） |
 | 事件流 | 可选接入 API-Football：进球、点球、红黄牌、换人的真实事件时间线 |
 | 球队档案 | 点击任意球队名称进入详情页，查看首发阵容阵型图、近六场真实战绩与球队状态串（队名自动翻译为中文，英文名保留于详情页） |
@@ -65,6 +67,21 @@ npm start       # 启动服务
 
 配额与 API-Football 的计费周期对齐，按 **UTC 自然日**统计，UTC 午夜（北京时间 08:00）自动重置（整点定时器 + 惰性检查双保险），无需重启服务。API 侧返回配额耗尽时自动暂停请求并发送告警邮件，次日 UTC 午夜自动恢复。
 
+## 免费足球数据源（Fotmob / Sofascore / FBref，无需密钥）
+
+复用 GitHub 开源轮子的抓取方案，为站点补充**五大联赛积分榜**与**单场阵容/统计/事件/XG**，全部免费、无需注册：
+
+| 数据源 | 用途 | 对应开源轮子 |
+|---|---|---|
+| Fotmob（主源） | 积分榜、单场详情（阵容/统计/事件/XG） | [pseudo-r/Public-FotMob-API](https://github.com/pseudo-r/Public-FotMob-API)、[maxencelobry/fotmob](https://github.com/maxencelobry/fotmob) |
+| Sofascore（备源） | 积分榜降级 | [probberechts/soccerdata](https://github.com/probberechts/soccerdata) |
+| FBref（备源） | 积分榜降级（HTML 解析） | [probberechts/soccerdata](https://github.com/probberechts/soccerdata) |
+
+- 实现于 `server/freefootball.js`：三源自动降级（Fotmob → Sofascore → FBref），全部失败时静默隐藏对应区块；
+- 数据经多级缓存（积分榜 6 小时 / 单场 5-30 分钟）；
+- 部分网络（如国内直连）会拦截 Sofascore 与 FBref（403 / Cloudflare 验证），此时自动降级为 Fotmob；部署在海外服务器（如 Render）时三个源均可使用；
+- 前端：首页新增「五大联赛积分榜」板块（联赛页签切换）；比赛详情页在 API-Football 数据缺失时自动展示 Fotmob 的阵容/统计/事件/XG。
+
 ### 用量告警邮件（可选）
 
 用量跨越 50% / 75% / 90% 以及配额耗尽时，会发送告警邮件（同一阈值每天只发一次，避免打扰）。配置方式：
@@ -105,6 +122,7 @@ football-pulse/
 │   ├── store.js            # 内存数据仓库（启动为空，由 fetcher 填充）
 │   ├── fetcher.js          # 真实数据同步层（football-data.org，多Key分流+多级缓存）
 │   ├── httpcache.js        # 多级 HTTP 缓存（内存 + 磁盘持久化）
+│   ├── freefootball.js     # 免费数据源（Fotmob / Sofascore / FBref：积分榜 + 单场补充）
 │   ├── apifootball.js      # 赔率 + 事件流补充层（API-Football，多Key配额与告警）
 │   ├── notify.js           # 用量告警邮件（SMTP，可选）
 │   └── data/

@@ -237,6 +237,48 @@
     } catch (_) { /* 保留当前视图 */ }
   }
 
+  /* ---------- 五大联赛积分榜（免费源） ---------- */
+  let standings = null;
+  let standingsTab = '英超';
+  async function loadStandings(force) {
+    try {
+      const q = force ? '?force=1' : '';
+      const res = await fetch('/api/standings' + q);
+      const j = await res.json();
+      standings = j.leagues || [];
+      const sec = $('#standingsSection');
+      if (standings.length) {
+        sec.hidden = false;
+        renderStandings();
+      }
+    } catch (_) { /* 静默：无积分榜不影响主页 */ }
+  }
+  function renderStandings() {
+    const tabs = $('#standingsTabs');
+    tabs.innerHTML = standings.map((l) =>
+      `<button class="standings-tab${l.league === standingsTab ? ' active' : ''}" data-league="${esc(l.league)}">${esc(l.league)}</button>`).join('');
+    tabs.querySelectorAll('.standings-tab').forEach((btn) => {
+      btn.addEventListener('click', () => { standingsTab = btn.dataset.league; renderStandings(); });
+    });
+    const cur = standings.find((l) => l.league === standingsTab) || standings[0];
+    const wrap = $('#standingsWrap');
+    if (!cur || !cur.rows.length) {
+      wrap.innerHTML = '<p class="empty-state">该联赛暂无积分榜数据</p>';
+      return;
+    }
+    const rows = cur.rows.map((r) => `<tr class="qual-${(r.qualColor || '').replace('#', '') || 'none'}">
+        <td class="st-rank">${r.rank}</td>
+        <td class="st-team">${esc(r.name)}</td>
+        <td>${r.played}</td><td>${r.win}</td><td>${r.draw}</td><td>${r.loss}</td>
+        <td>${r.gf}</td><td>${r.ga}</td><td class="st-gd">${r.gd > 0 ? '+' : ''}${r.gd}</td>
+        <td class="st-pts">${r.pts}</td>
+      </tr>`).join('');
+    wrap.innerHTML = `<table class="standings-table">
+      <thead><tr><th>#</th><th>球队</th><th>赛</th><th>胜</th><th>平</th><th>负</th><th>进</th><th>失</th><th>净</th><th>积分</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <p class="standings-note">数据来源 ${cur.source}</p>`;
+  }
+
   /* ---------- 手动刷新 ---------- */
   let refreshing = false;
   let refreshCoolDown = 0;
@@ -264,6 +306,7 @@
         renderDateNav();
         renderFilters();
         renderSelect();
+        loadStandings(true);
         refreshCoolDown = Date.now() + 30 * 1000;
       } else {
         txt.textContent = '刷新失败';
@@ -291,6 +334,7 @@
     renderSelect();
     render();
     $('#refreshBtn').addEventListener('click', refreshData);
+    loadStandings(false);
     connectWS((data) => {
       if (data.type === 'data-refreshed') { refetchOverview(); return; }
       applyLiveUpdate(data);

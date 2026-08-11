@@ -49,7 +49,7 @@ app.get('/api/team/:id', (req, res) => {
   res.json({ team });
 });
 
-/* 单场详情（按需补充 API-Football 赔率与事件） */
+/* 单场详情（按需补充 API-Football 赔率与事件；缺失的阵容/统计/事件由 Fotmob 免费源补充） */
 app.get('/api/match/:id', async (req, res) => {
   const raw = store.rawMatchById(req.params.id);
   if (!raw) return res.status(404).json({ error: '赛事不存在' });
@@ -61,7 +61,30 @@ app.get('/api/match/:id', async (req, res) => {
       console.log(`[apifootball] 单场补充失败 ${raw.id}：${err.message}`);
     }
   }
+  // 免费源补充：阵容缺失 / 统计缺失 / 事件为空时用 Fotmob 填充
+  const free = require('./freefootball');
+  try {
+    const ht = store.teamIndex.get(raw.home.id);
+    const at = store.teamIndex.get(raw.away.id);
+    const needLineup = (!ht || !ht.lineup) || (!at || !at.lineup);
+    const needStats = !raw.stats;
+    const needEvents = !raw.events || !raw.events.length;
+    if ((needLineup || needStats || needEvents) && raw.kickoffTs) {
+      await free.enrichMatch(raw, false);
+    }
+  } catch (_) { /* 免费源失败静默 */ }
   res.json({ match: store.matchById(req.params.id) });
+});
+
+/* 五大联赛积分榜（免费源：Fotmob 主 → Sofascore/FBref 备；?force=1 绕过缓存） */
+app.get('/api/standings', async (req, res) => {
+  try {
+    const free = require('./freefootball');
+    const list = await free.standingsAll(req.query.force === '1');
+    res.json({ leagues: list });
+  } catch (err) {
+    res.status(502).json({ error: `积分榜获取失败：${err.message}` });
+  }
 });
 
 /* 手动刷新：立即同步最新赛程/比分/赔率（绕过赔率缓存；与定时同步互斥） */
