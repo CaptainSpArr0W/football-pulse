@@ -23,7 +23,7 @@ const CC_TO_ZH = {
   FRA: { zh: '法甲', re: /^ligue 1$/i },
 };
 
-const DEFAULT_DATES = ['2025-08-16', '2025-08-17', '2025-08-22', '2025-08-23', '2025-08-24'];
+const DEFAULT_DATES = ['2025-08-16', '2025-08-17', '2025-08-22', '2025-08-23', '2025-08-24', '2026-05-16'];
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function log(msg) { console.log(`[seed-2025] ${msg}`); }

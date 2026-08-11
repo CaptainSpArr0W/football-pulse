@@ -515,6 +515,7 @@ async function enrichMatch(match, force) {
     }
     if (d.stats && !match.stats) match.stats = d.stats;
     if (d.events && !match.events.length) match.events = d.events;
+    if (d.xg && (d.xg.home > 0 || d.xg.away > 0)) match.xg = d.xg;
     return { ok: true, ...d };
   } catch (err) {
     return { ok: false, reason: err.message };

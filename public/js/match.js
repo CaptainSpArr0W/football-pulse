@@ -73,12 +73,16 @@
       ? `<span data-role="hs">${m.score.home}</span> : <span data-role="as">${m.score.away}</span>`
       : score;
 
-    if (isLive && m.xg && m.xg.home + m.xg.away > 0) renderHeroXg(m);
+    if ((isLive || isFinished) && m.xg && m.xg.home + m.xg.away > 0) renderHeroXg(m);
     else $('#heroXg').innerHTML = '';
   }
 
   function renderHeroXg(m) {
     const total = m.xg.home + m.xg.away || 1;
+    /* 预期失球 = 对方本场 xG */
+    const xgaHome = m.xg.away;
+    const xgaAway = m.xg.home;
+    const xgaTotal = xgaHome + xgaAway || 1;
     $('#heroXg').innerHTML = `<div class="xg-row">
       <span class="xg-tag home-tag" data-role="xgh">${m.xg.home.toFixed(2)}</span>
       <div class="xg-track">
@@ -88,7 +92,17 @@
       </div>
       <span class="xg-tag away-tag" data-role="xga">${m.xg.away.toFixed(2)}</span>
     </div>
-    <div class="xg-caption">预期进球 XG · 实时更新</div>`;
+    <div class="xg-caption">预期进球 XG · ${m.status === 'live' ? '实时更新' : '全场数据'}</div>
+    <div class="xg-row xga-row">
+      <span class="xg-tag home-tag">${xgaHome.toFixed(2)}</span>
+      <div class="xg-track">
+        <div class="xg-bar xga home" style="width:${((xgaHome / xgaTotal) * 100).toFixed(1)}%"></div>
+        <div class="xg-bar xga away" style="width:${((xgaAway / xgaTotal) * 100).toFixed(1)}%"></div>
+        <div class="xg-divider"></div>
+      </div>
+      <span class="xg-tag away-tag">${xgaAway.toFixed(2)}</span>
+    </div>
+    <div class="xg-caption">预期失球 XGA（= 对方 XG）</div>`;
   }
 
   /* ---------- 实时统计 ---------- */
