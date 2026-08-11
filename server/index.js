@@ -83,6 +83,53 @@ app.get('/api/match/:id', async (req, res) => {
   res.json({ match: store.matchById(req.params.id) });
 });
 
+/* 比赛预览（弹窗卡片）：实力分区 + 近六场进/失球 + 首发 */
+app.get('/api/match/preview/:id', async (req, res) => {
+  try {
+    const raw = store.rawMatchById(req.params.id);
+    if (!raw) return res.status(404).json({ error: '赛事不存在' });
+    const powerRank = require('./power-rank');
+    // 已赛/直播：补充阵容（复用 Fotmob 免费源）
+    if (raw.status !== 'upcoming') {
+      try {
+        const free = require('./freefootball');
+        const ht = store.teamIndex.get(raw.home.id);
+        const at = store.teamIndex.get(raw.away.id);
+        const need = (!ht || !ht.lineup) || (!at || !at.lineup) || !raw.stats || !raw.events || !raw.events.length;
+        if (need && raw.kickoffTs) await free.enrichMatch(raw, false);
+      } catch (_) { /* 补充失败不影响预览 */ }
+    }
+    const ht = store.teamIndex.get(raw.home.id);
+    const at = store.teamIndex.get(raw.away.id);
+    const formOf = (t) => {
+      if (!t || !Array.isArray(t.recent) || !t.recent.length) return null;
+      let gf = 0, ga = 0;
+      for (const r of t.recent) { gf += Number(r.gf) || 0; ga += Number(r.ga) || 0; }
+      return { played: t.recent.length, gf, ga, gd: gf - ga, form: t.form || '' };
+    };
+    const lineupOf = (t) => {
+      if (!t || !t.lineup) return null;
+      return { formation: t.formation || '', players: t.lineup };
+    };
+    const [ph, pa] = await Promise.all([
+      powerRank.powerOf(ht).catch(() => null),
+      powerRank.powerOf(at).catch(() => null),
+    ]);
+    res.json({
+      match: store.matchById(req.params.id),
+      power: { home: ph, away: pa },
+      form: { home: formOf(ht), away: formOf(at) },
+      lineups: {
+        home: lineupOf(ht), away: lineupOf(at),
+        predicted: raw.status === 'upcoming',
+        status: raw.status,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* 五大联赛积分榜（免费源：Fotmob 主 → Sofascore/FBref 备；?force=1 绕过缓存） */
 app.get('/api/standings', async (req, res) => {
   try {

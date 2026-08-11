@@ -164,10 +164,31 @@ function mapFotmobStats(statsObj) {
 /* Fotmob 阵容 → 站点 lineup 格式 [[name, num, {pos}], ...]（结构：lineup.homeTeam.starters） */
 function mapFotmobLineup(lineup) {
   if (!lineup || !lineup.homeTeam || !Array.isArray(lineup.homeTeam.starters)) return null;
-  const build = (team) => (team && team.starters || []).map((p) => {
-    const pos = p.positionId === 1 ? 'GK' : p.positionId === 2 ? 'DF' : p.positionId === 3 ? 'MF' : 'FW';
-    return [p.name || '', p.shirtNumber != null ? p.shirtNumber : '', { pos }];
-  });
+  /* Fotmob positionId 分档：11=GK，20-39=后卫，40-79=中场，80+=前锋 */
+  const posOf = (pid) => {
+    const p = Number(pid);
+    if (p === 11) return 'GK';
+    if (p >= 20 && p <= 39) return 'DF';
+    if (p >= 40 && p <= 79) return 'MF';
+    if (p >= 80) return 'FW';
+    return 'MF';
+  };
+  /* 无坐标时按位置生成默认阵型坐标（GK 底中，后卫/中场/前锋逐排分布） */
+  const build = (team) => {
+    const starters = (team && team.starters) || [];
+    const rows = { GK: [], DF: [], MF: [], FW: [] };
+    for (const p of starters) rows[posOf(p.positionId)].push(p);
+    const yOf = { GK: 14, DF: 34, MF: 54, FW: 74 };
+    const out = [];
+    for (const g of ['GK', 'DF', 'MF', 'FW']) {
+      const arr = rows[g];
+      arr.forEach((p, i) => {
+        const x = arr.length <= 1 ? 50 : 14 + (i * 72) / (arr.length - 1);
+        out.push([p.name || '', p.shirtNumber != null ? p.shirtNumber : '', { pos: g, x, y: yOf[g] }]);
+      });
+    }
+    return out;
+  };
   const home = build(lineup.homeTeam);
   const away = build(lineup.awayTeam);
   if (!home.length && !away.length) return null;

@@ -202,8 +202,8 @@ function matchCard(match, index) {
     : match.oppHc
       ? '<span class="opp-badge opp-hc">⚡ 好机会 · 盘口异动</span>'
       : '';
-  return `<div class="match-card${isLive ? ' is-live' : ''}${(match.oppXg || match.oppHc) ? ' is-opp' : ''}" data-match-row="${match.id}" style="animation-delay:${Math.min(index * 45, 360)}ms">
-    <button class="sub-btn${subOn ? ' on' : ''}" data-sub="${match.id}" title="订阅本场比赛">${subOn ? '★' : '☆'}</button>
+  return `<div class="match-card${isLive ? ' is-live' : ''}${(match.oppXg || match.oppHc) ? ' is-opp' : ''} match-clickable" data-match-row="${match.id}" data-match="${match.id}" style="animation-delay:${Math.min(index * 45, 360)}ms" title="点击查看实力分区与预测首发">
+    <button class="sub-btn${subOn ? ' on' : ''}" data-sub="${match.id}" title="订阅本场比赛" onclick="event.stopPropagation()">${subOn ? '★' : '☆'}</button>
     <div class="match-meta">
       <span class="match-comp">${esc(match.competition)} · ${esc(match.round)}</span>
       <span class="match-round">${esc(match.date)}</span>
