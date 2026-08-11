@@ -82,7 +82,7 @@ class Store {
       halfReport: m.halfReport || null,
       odds: m.odds || { europe: [], asian: [], total: [], corners: [] },
       events: (m.events || []).slice(-8),
-      h2h: m.h2h || null,
+      h2h: translate.zhH2h(m.h2h) || null,
       weather: translate.zhWeather(m.weather) || null,
       oppXg: m.oppXg || false,
       oppHc: m.oppHc || false,
@@ -98,12 +98,12 @@ class Store {
     pm.homeTeam = {
       id: m.home.id, name: (ht && ht.name) || m.home.name, short: (ht && ht.short) || '', color: (ht && ht.color) || '#5c6bc0',
       color2: (ht && ht.color2) || '#3949ab', crest: (ht && ht.crest) || null,
-      formation: (ht && ht.formation) || '', lineup: translate.zhLineup(ht && ht.lineup) || null, recent: (ht && ht.recent) || [],
+      formation: (ht && ht.formation) || '', lineup: translate.zhLineup(ht && ht.lineup) || null, recent: translate.zhRecent(ht && ht.recent) || [],
     };
     pm.awayTeam = {
       id: m.away.id, name: (at && at.name) || m.away.name, short: (at && at.short) || '', color: (at && at.color) || '#5c6bc0',
       color2: (at && at.color2) || '#3949ab', crest: (at && at.crest) || null,
-      formation: (at && at.formation) || '', lineup: translate.zhLineup(at && at.lineup) || null, recent: (at && at.recent) || [],
+      formation: (at && at.formation) || '', lineup: translate.zhLineup(at && at.lineup) || null, recent: translate.zhRecent(at && at.recent) || [],
     };
     return pm;
   }

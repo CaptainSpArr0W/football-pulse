@@ -80,7 +80,14 @@ app.get('/api/match/:id', async (req, res) => {
       await free.enrichMatch(raw, false);
     }
   } catch (_) { /* 免费源失败静默 */ }
-  res.json({ match: store.matchById(req.params.id) });
+  // 首发阵容球员名汉化（在线翻译，缓存 + 限额，失败保留原文）
+  const translate = require('./translate');
+  try {
+    const pm = store.matchById(req.params.id);
+    if (pm.homeTeam && pm.homeTeam.lineup) pm.homeTeam.lineup = await translate.translatePlayerNames(pm.homeTeam.lineup);
+    if (pm.awayTeam && pm.awayTeam.lineup) pm.awayTeam.lineup = await translate.translatePlayerNames(pm.awayTeam.lineup);
+    res.json({ match: pm });
+  } catch (_) { res.json({ match: store.matchById(req.params.id) }); }
 });
 
 /* 比赛预览（弹窗卡片）：实力分区 + 近六场进/失球 + 首发 */

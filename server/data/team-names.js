@@ -319,10 +319,32 @@ const ZH = {
   'iceland': '冰岛', 'strákarnir okkar': '冰岛',
   'finland': '芬兰', 'huuhkajat': '芬兰',
   'russia': '俄罗斯', 'sbornaya': '俄罗斯',
+
+  /* ---------- Fotmob / 转播常用短名补充 ---------- */
+  'newcastle': '纽卡斯尔联',
+  'west ham': '西汉姆联',
+  'tottenham': '热刺',
+  'man city': '曼城',
+  'man united': '曼联',
+  'nottm forest': '诺丁汉森林',
+  'leeds': '利兹联',
+  'leverkusen': '勒沃库森',
+  'frankfurt': '法兰克福',
+  'dortmund': '多特蒙德',
+  'mainz': '美因茨',
+  'koln': '科隆',
+  'heidenheim': '海登海姆', 'fc heidenheim': '海登海姆',
+  'st. pauli': '圣保利',
+  'mgladbach': '门兴格拉德巴赫',
+  'monchengladbach': '门兴格拉德巴赫',
+  'cremonese': '克雷莫纳',
+  'metz': '梅斯',
+  'pisa': '比萨',
+  'real oviedo': '皇家奥维耶多',
 };
 
 /* 变音符号归一化 + 中英对照查询（供 fetcher 使用） */
-const _norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+const _norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
 const NORM = {};
 for (const k of Object.keys(ZH)) NORM[_norm(k)] = ZH[k];
 
