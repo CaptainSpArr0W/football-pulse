@@ -124,7 +124,7 @@ class Store {
     return {
       id: t.id, name: t.name, en: t.en, short: t.short,
       color: t.color, color2: t.color2, crest: t.crest, league: t.league,
-      formation: t.formation, lineup: t.lineup, recent: t.recent, form: t.form,
+      formation: t.formation, lineup: translate.zhLineup(t.lineup), recent: translate.zhRecent(t.recent), form: t.form,
       matches: upcoming.map((m) => this._publicMatch(m)),
       news: t.news || [],
     };

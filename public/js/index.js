@@ -10,6 +10,32 @@
 
   const $ = (sel) => document.querySelector(sel);
 
+  /* ---------- 标签点击翻转反馈（事件委托，覆盖动态渲染的标签） ---------- */
+  document.addEventListener('click', (e) => {
+    const el = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
+    if (!el || typeof el.closest !== 'function') return;
+    const btn = el.closest('.filter-chip, .standings-tab, .date-btn, .refresh-btn');
+    if (!btn) return;
+    const flip = (n) => { n.classList.remove('tap-flip'); void n.offsetWidth; n.classList.add('tap-flip'); };
+    // 点击处理可能重建标签 DOM（筛选/积分榜重渲染）；先记录类型，下一轮事件循环按类型精确定位补动画
+    const key = btn.dataset.comp !== undefined ? btn.dataset.comp
+      : (btn.dataset.date !== undefined ? btn.dataset.date
+        : (btn.dataset.league !== undefined ? btn.dataset.league : ''));
+    const kind = btn.classList.contains('filter-chip') ? 'filter-chip'
+      : btn.classList.contains('standings-tab') ? 'standings-tab'
+        : btn.classList.contains('date-btn') ? 'date-btn' : '';
+    flip(btn);
+    if (key !== '' && kind) {
+      const sel = '.' + kind + '[data-' + (kind === 'standings-tab' ? 'league' : kind === 'date-btn' ? 'date' : 'comp') + '="' + CSS.escape(key) + '"]';
+      setTimeout(() => { const c = document.querySelector(sel); if (c && !c.classList.contains('tap-flip')) flip(c); }, 0);
+    }
+  });
+  document.addEventListener('animationend', (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains('tap-flip')) {
+      e.target.classList.remove('tap-flip');
+    }
+  });
+
   /* ---------- 日期工具 ---------- */
   function shiftDate(dateStr, n) {
     const d = new Date(dateStr + 'T00:00:00Z');

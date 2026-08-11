@@ -53,6 +53,10 @@ app.get('/api/team/:id', async (req, res) => {
     } catch (_) { team = null; }
   }
   if (!team) return res.status(404).json({ error: '球队不存在' });
+  // 首发阵容球员名汉化（在线翻译，缓存 + 限额；MyMemory 配额恢复后自动生效）
+  try {
+    if (team.lineup) team.lineup = await require('./translate').translatePlayerNames(team.lineup);
+  } catch (_) { /* 降级保留原文 */ }
   res.json({ team });
 });
 
