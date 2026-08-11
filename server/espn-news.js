@@ -41,28 +41,33 @@ async function leagueTeams(league) {
   return teams;
 }
 
-/* 球队新闻（ESPN：按球队 id） */
+/* 球队新闻（ESPN：按球队 id；仅保留最近 15 天） */
 async function teamNews(espnId, league) {
   const slug = LEAGUE_SLUGS[league];
-  const key = `espn-news:${slug}:${espnId}`;
+  const key = `espn-news:15d:${slug}:${espnId}`;
   const cached = httpcache.get(key);
   if (cached !== undefined) return cached;
-  const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/news?team=${espnId}&limit=8`, { headers: UA });
+  const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/news?team=${espnId}&limit=15`, { headers: UA });
   if (!res.ok) return [];
   const j = await res.json();
-  const out = (j.articles || []).slice(0, 8).map((a) => {
-    const d = a.published ? new Date(a.published) : null;
-    const bj = d && !isNaN(d.getTime()) ? new Date(d.getTime() + 8 * 3600 * 1000) : null;
-    const links = a.links || {};
-    return {
-      sentiment: classify(a.headline || ''),
-      source: 'ESPN',
-      time: bj ? `${pad(bj.getUTCMonth() + 1)}-${pad(bj.getUTCDate())} ${pad(bj.getUTCHours())}:${pad(bj.getUTCMinutes())}` : '',
-      title: a.headline || '',
-      summary: a.description || '',
-      link: (links.web && links.web.href) || (links.mobile && links.mobile.href) || '',
-    };
-  });
+  const now = Date.now();
+  const CUTOFF = 15 * 24 * 3600 * 1000;
+  const out = (j.articles || [])
+    .filter((a) => a.published && now - Date.parse(a.published) <= CUTOFF)
+    .slice(0, 8)
+    .map((a) => {
+      const d = a.published ? new Date(a.published) : null;
+      const bj = d && !isNaN(d.getTime()) ? new Date(d.getTime() + 8 * 3600 * 1000) : null;
+      const links = a.links || {};
+      return {
+        sentiment: classify(a.headline || ''),
+        source: 'ESPN',
+        time: bj ? `${pad(bj.getUTCMonth() + 1)}-${pad(bj.getUTCDate())} ${pad(bj.getUTCHours())}:${pad(bj.getUTCMinutes())}` : '',
+        title: a.headline || '',
+        summary: a.description || '',
+        link: (links.web && links.web.href) || (links.mobile && links.mobile.href) || '',
+      };
+    });
   httpcache.set(key, out, 30 * 60 * 1000);
   return out;
 }
@@ -95,36 +100,16 @@ async function matchEspnId(team, league) {
   return hit ? hit.id : null;
 }
 
-/* 刷新：为 store 中所有五大联赛球队拉取新闻（并发 4，避免被 ESPN 限流） */
-async function refresh(store) {
-  const targets = [];
-  for (const t of store.teamIndex.values()) {
-    if (t.league && LEAGUE_SLUGS[t.league] && (t.en || t.name)) targets.push(t);
+/* 取单支球队的 ESPN 新闻（供 cn-news 聚合：匹配 id + 拉取 + 15 天过滤） */
+async function getNewsForTeam(team) {
+  if (!(team.league && LEAGUE_SLUGS[team.league])) return [];
+  try {
+    const espnId = await matchEspnId(team, team.league);
+    if (!espnId) return [];
+    return await teamNews(espnId, team.league);
+  } catch (_) {
+    return [];
   }
-  if (!targets.length) return 0;
-  let idx = 0;
-  const worker = async () => {
-    while (idx < targets.length) {
-      const t = targets[idx++];
-      try {
-        const espnId = await matchEspnId(t, t.league);
-        if (!espnId) continue;
-        t.news = await teamNews(espnId, t.league);
-      } catch (_) { /* 单队失败不影响其它 */ }
-    }
-  };
-  await Promise.all(Array.from({ length: 4 }, () => worker()));
-  log(`新闻刷新完成：${targets.length} 支球队`);
-  return targets.length;
 }
 
-function start(store) {
-  const loop = () => refresh(store).catch((e) => log('刷新异常：' + e.message));
-  // 启动后稍等（等 fetcher 先填充球队），再立即刷一次
-  setTimeout(loop, 8000);
-  const timer = setInterval(loop, 30 * 60 * 1000);
-  if (timer.unref) timer.unref();
-  log('新闻爬虫已启动：每 30 分钟刷新一次');
-}
-
-module.exports = { start, refresh, teamNews, leagueTeams };
+module.exports = { teamNews, leagueTeams, getNewsForTeam, classify, norm };

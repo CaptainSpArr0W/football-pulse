@@ -120,7 +120,7 @@
           <span class="news-time">${esc(n.time)}</span>
         </div>
         ${titleHtml}
-        <p class="news-summary">${esc(n.summary)}</p>
+        ${n.summary ? `<p class="news-summary">${esc(n.summary)}</p>` : ''}
       </article>`;
     }).join('');
   }
