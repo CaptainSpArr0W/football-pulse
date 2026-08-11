@@ -205,6 +205,17 @@ if (process.env.SEED_2025) {
     const n = require('./understat').applyAll(store);
     if (n > 0) console.log(`[understat] 已填充 xG：${n} 场比赛`);
   }, 20 * 1000);
+  /* The Odds API 赔率：为未开赛五大联赛比赛填充赔率（免费档 500 次/月，每 15 分钟刷新） */
+  const oddsApi = require('./odds-api');
+  async function oddsLoop() {
+    try {
+      const r = await oddsApi.applyToStore(store);
+      if (r.disabled) return;
+      if (r.filled || r.flagged) console.log(`[odds-api] 赔率已填充 ${r.filled} 场 · 盘口异动 ${r.flagged} 场`);
+    } catch (_) { /* 静默降级 */ }
+  }
+  setTimeout(oddsLoop, 10 * 1000);
+  setInterval(oddsLoop, 15 * 60 * 1000);
 }
 
 server.listen(PORT, () => {

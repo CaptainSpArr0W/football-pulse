@@ -151,11 +151,18 @@
   /* ---------- 赔率（无真实赔率数据时隐藏整块） ---------- */
   function renderOdds(m) {
     const wrap = $('#oddsWrap');
-    wrap.innerHTML = oddsTable(m);
     const hasOdds = m.odds && ((m.odds.europe && m.odds.europe.length) || (m.odds.asian && m.odds.asian.length)
       || (m.odds.total && m.odds.total.length) || (m.odds.corners && m.odds.corners.length));
     const section = wrap.closest('section');
-    if (section) section.hidden = !hasOdds;
+    if (section) section.hidden = false;
+    if (hasOdds) {
+      wrap.innerHTML = oddsTable(m);
+    } else {
+      wrap.innerHTML = `<div class="odds-empty">
+        <p><b>暂无赔率数据</b></p>
+        <p class="odds-empty-note">该场比赛未匹配到赔率数据源（The Odds API 仅提供近期比赛赔率；历史比赛无赔率）</p>
+      </div>`;
+    }
   }
 
   /* ---------- 双方阵容 ---------- */
