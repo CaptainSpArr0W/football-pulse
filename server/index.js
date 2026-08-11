@@ -199,23 +199,14 @@ require('./opportunity').start(store);
 /* ---------- 新闻聚合：ESPN（15 天内）+ 新浪体育 + 搜狐体育 → 各球队舆论新闻 ---------- */
 require('./cn-news').start(store);
 
-/* ---------- 2025 调试数据（SEED_2025=1 时启用：跳过真实同步，用 2025 赛季数据填充） ---------- */
-if (process.env.SEED_2025) {
-  const seed = require('./seed-2025');
-  seed.seed(store).then(() => {
-    const us = require('./understat').applyAll(store);
-    console.log(`[seed-2025] 调试数据就绪：${store.matches.length} 场比赛 / ${store.teamIndex.size} 支球队`);
-    console.log(`[understat] 已填充 xG：${us} 场比赛（Understat 2025/26 数据）`);
-  }).catch((e) => console.log(`[seed-2025] 种子失败: ${e.message}`));
-} else {
-  /* ---------- 真实数据同步（可选，需 FOOTBALL_API_KEY） ---------- */
-  const fetcher = require('./fetcher');
-  fetcher.start(store);
-  /* Understat xG 补充：同步完成后为已完赛比赛填充（每 6 小时重试） */
-  setTimeout(() => {
-    const n = require('./understat').applyAll(store);
-    if (n > 0) console.log(`[understat] 已填充 xG：${n} 场比赛`);
-  }, 20 * 1000);
+/* ---------- 真实数据同步（需 FOOTBALL_API_KEY 或 server/data/api-config.json） ---------- */
+const fetcher = require('./fetcher');
+fetcher.start(store);
+/* Understat xG 补充：同步完成后为已完赛比赛填充（每 6 小时重试） */
+setTimeout(() => {
+  const n = require('./understat').applyAll(store);
+  if (n > 0) console.log(`[understat] 已填充 xG：${n} 场比赛`);
+}, 20 * 1000);
   /* 赔率策略（The Odds API 低频轮询，节省配额）：
    * - 早盘：每天 09:00 固定一轮，为当日未开赛五大联赛比赛填充赔率（5 次请求）
    * - 临场：开赛前 ≤15 分钟时读取（每联赛 6 小时冷却，每天每联赛至多 2 次）
@@ -257,7 +248,6 @@ if (process.env.SEED_2025) {
   }
   setTimeout(oddsLoop, 10 * 1000);
   setInterval(oddsLoop, 5 * 60 * 1000);
-}
 
 server.listen(PORT, () => {
   console.log(`⚽ Football Pulse 已启动`);

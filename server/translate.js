@@ -80,6 +80,7 @@ function zhDict(text) {
 /* ---------- 在线翻译（MyMemory，免费 5000 字符/天） ---------- */
 const DAY_LIMIT = 4500; // 每日在线翻译字符上限（保留余量）
 const usage = { date: '', chars: 0 };
+let quotaExhausted = { date: '' }; // MyMemory 返回配额耗尽后，当日跳过在线请求
 
 function usageToday() {
   const today = new Date().toISOString().slice(0, 10);
@@ -95,6 +96,8 @@ async function onlineZh(text) {
   if (cached !== undefined) return cached;
   const u = usageToday();
   if (u.chars + s.length > DAY_LIMIT) return s; // 超限降级原文
+  const today = new Date().toISOString().slice(0, 10);
+  if (quotaExhausted.date === today) return s; // MyMemory 配额已耗尽，当日不再发起请求
   try {
     const q = encodeURIComponent(s.slice(0, 480));
     const res = await fetch(`https://api.mymemory.translated.net/get?q=${q}&langpair=en|zh-CN`, {
@@ -103,6 +106,11 @@ async function onlineZh(text) {
     if (!res.ok) return s;
     const j = await res.json();
     const zh = (j.responseData && j.responseData.translatedText) || '';
+    if (zh.includes('MYMEMORY WARNING')) {
+      quotaExhausted.date = today;
+      console.log('[translate] MyMemory 免费配额已耗尽，今日在线翻译降级为原文，明日自动恢复');
+      return s;
+    }
     if (zh && zh !== s) {
       u.chars += s.length;
       httpcache.set(key, zh, 30 * 24 * 3600 * 1000);

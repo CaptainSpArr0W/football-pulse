@@ -2,8 +2,6 @@
  * 免费足球数据源（GitHub 轮子同款方案的 Node 实现）
  * - Fotmob（主源，实测可用）：/api/data/ 前缀的非官方 JSON 接口
  *   （对应 GitHub 轮子 pseudo-r/Public-FotMob-API 与 maxencelobry/fotmob，已跟进其接口迁移）
- * - Sofascore（备源）：api.sofascore.com/api/v1/ 非官方 JSON 接口
- *   （对应 probberechts/soccerdata 的 Sofascore reader；部分网络/区域会 403，按需降级）
  * - FBref（备源）：fbref.com 页面 HTML 解析（对应 probberechts/soccerdata 的 FBref reader；
  *   部分网络有 Cloudflare 验证，按需降级）
  *
@@ -256,42 +254,6 @@ function mapFotmobEvents(matchFacts) {
   return events.length ? events : null;
 }
 
-/* ---------- Sofascore（备源，部分网络 403 时自动跳过） ---------- */
-
-const SOFA = 'https://api.sofascore.com/api/v1';
-const SOFA_LEAGUES = { 英超: 17, 西甲: 8, 德甲: 35, 意甲: 23, 法甲: 34 };
-
-async function sofaGet(path, ttlMs, force) {
-  return fetchJson(SOFA + path, {
-    'user-agent': UA['user-agent'],
-    'accept': '*/*', 'accept-language': 'en-US,en;q=0.9',
-    'referer': 'https://www.sofascore.com/',
-  }, ttlMs, force);
-}
-
-async function sofascoreStandings(leagueName, force) {
-  const id = SOFA_LEAGUES[leagueName];
-  if (!id) return null;
-  const seasons = await sofaGet(`/unique-tournament/${id}/seasons`, 6 * 3600 * 1000, force);
-  const sid = seasons.seasons && seasons.seasons[0] && seasons.seasons[0].id;
-  if (!sid) return null;
-  const j = await sofaGet(`/unique-tournament/${id}/season/${sid}/standings/total`, 6 * 3600 * 1000, force);
-  const rows = j.standings && j.standings[0] && j.standings[0].rows;
-  if (!Array.isArray(rows)) return null;
-  return {
-    source: 'sofascore', league: leagueName,
-    rows: rows.map((r) => ({
-      rank: r.position,
-      name: TEAM_NAMES_ZH.zhTeamName(r.team && r.team.name) || (r.team && r.team.name) || '',
-      en: r.team && r.team.name || '',
-      played: r.played || 0, win: r.wins || 0, draw: r.draws || 0, loss: r.losses || 0,
-      gf: r.scoresFor || 0, ga: r.scoresAgainst || 0,
-      gd: r.goalConDiff != null ? r.goalConDiff : (r.scoresFor || 0) - (r.scoresAgainst || 0),
-      pts: r.points || 0, qualColor: '',
-    })),
-  };
-}
-
 /* ---------- FBref（备源，Playwright 浏览器抓取以通过 Cloudflare JS 挑战） ---------- */
 
 const FBREF = 'https://fbref.com';
@@ -405,7 +367,7 @@ async function standingsAll(force) {
   const out = [];
   for (const name of BIG_FIVE) {
     let s = null;
-    for (const fn of [fotmobStandings, sofascoreStandings, fbrefStandings]) {
+    for (const fn of [fotmobStandings, fbrefStandings]) {
       try { s = await fn(name, force); } catch (_) { s = null; }
       if (s && s.rows && s.rows.length) break;
     }

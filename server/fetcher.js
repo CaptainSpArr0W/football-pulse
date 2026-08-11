@@ -340,7 +340,7 @@ async function syncOnce(store, opts = {}) {
       d.setUTCDate(d.getUTCDate() + n);
       return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
     };
-    const j = await api(`/matches?dateFrom=${off(-2)}&dateTo=${off(5)}`);
+    const j = await api(`/matches?dateFrom=${off(-2)}&dateTo=${off(7)}`);
     const fixtures = j.matches || [];
     const changed = [];
     for (const fx of fixtures) {
