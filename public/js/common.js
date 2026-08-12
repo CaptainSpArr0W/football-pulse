@@ -158,35 +158,25 @@ function predPanel(pred) {
   </div>`;
 }
 
-/* 卡片选项卡组装：赔率 tabs（若有）+ 模型预测 tab（若有），均置于选项卡内 */
+/* 卡片选项卡组装：仅赔率 tabs（预测展示已移至比赛详情页与预览弹窗） */
 function oddsSection(match) {
   const od = match.odds || {};
   const hasOdds = (od.europe && od.europe.length) || (od.asian && od.asian.length)
     || (od.total && od.total.length) || (od.corners && od.corners.length);
-  const pred = match.pred;
-  if (!hasOdds && !pred) return '';
-
-  const tabs = [];
-  const panels = [];
-  if (hasOdds) {
-    tabs.push('<button class="odds-tab active" data-tab="europe">欧赔</button>',
-      '<button class="odds-tab" data-tab="asian">亚盘</button>',
-      '<button class="odds-tab" data-tab="total">大小球</button>',
-      '<button class="odds-tab" data-tab="corners">角球</button>');
-    panels.push(`<div class="odds-panel" data-panel="europe">${europeTable(match)}</div>`,
-      `<div class="odds-panel" data-panel="asian" hidden>${asianTable(match)}</div>`,
-      `<div class="odds-panel" data-panel="total" hidden>${totalTable(match)}</div>`,
-      `<div class="odds-panel" data-panel="corners" hidden>${cornersTable(match)}</div>`);
-  }
-  if (pred) {
-    tabs.push(`<button class="odds-tab${hasOdds ? '' : ' active'}" data-tab="pred">预测</button>`);
-    panels.push(`<div class="odds-panel" data-panel="pred"${hasOdds ? ' hidden' : ''}>${predPanel(pred)}</div>`);
-  }
+  if (!hasOdds) return '';
 
   return `<div class="odds-wrap" data-odds>
-    <div class="odds-tabs">${tabs.join('')}</div>
-    ${panels.join('')}
-    <div class="odds-updated">${match.status === 'live' ? '实时更新' : pred ? '模型预测 · Dixon-Coles' : '赛前数据'}</div>
+    <div class="odds-tabs">
+      <button class="odds-tab active" data-tab="europe">欧赔</button>
+      <button class="odds-tab" data-tab="asian">亚盘</button>
+      <button class="odds-tab" data-tab="total">大小球</button>
+      <button class="odds-tab" data-tab="corners">角球</button>
+    </div>
+    <div class="odds-panel" data-panel="europe">${europeTable(match)}</div>
+    <div class="odds-panel" data-panel="asian" hidden>${asianTable(match)}</div>
+    <div class="odds-panel" data-panel="total" hidden>${totalTable(match)}</div>
+    <div class="odds-panel" data-panel="corners" hidden>${cornersTable(match)}</div>
+    <div class="odds-updated">${match.status === 'live' ? '实时更新' : '赛前数据'}</div>
   </div>`;
 }
 

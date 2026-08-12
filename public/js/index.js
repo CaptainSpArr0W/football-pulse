@@ -171,7 +171,7 @@
   function renderMatchList() {
     const list = visibleMatches();
     const wrap = $('#matchList');
-    wrap.innerHTML = list.map((m, i) => matchCard({ ...m, pred: predMap[m.id] }, i)).join('');
+    wrap.innerHTML = list.map((m, i) => matchCard(m, i)).join('');
     const empty = $('#emptyState');
     empty.hidden = list.length > 0;
     empty.innerHTML = list.length
