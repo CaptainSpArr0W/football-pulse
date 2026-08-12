@@ -78,12 +78,16 @@
       $('#lineupList').innerHTML = '<li style="color:var(--ink-3);font-size:12.5px">暂无阵容数据，接入真实数据源后可查看</li>';
       return;
     }
-    $('#formationNote').textContent = `阵型 ${team.formation} · 阵容 ${team.lineup.length} 人${team.lineupSource ? ' · ' + team.lineupSource : ''}`;
+    /* 球场图：仅首发 11 人按阵型排布；列表：完整阵容 */
+    const start = (team.starting11 && team.starting11.length === 11) ? team.starting11 : team.lineup;
+    const formation = team.formation || '首发 11 人';
+    const isFullList = start.length === team.lineup.length;
+    $('#formationNote').textContent = `阵型 ${formation} · ${isFullList ? '阵容 ' + team.lineup.length : '首发 11 人 · 共 ' + team.lineup.length} 人${team.lineupSource ? ' · ' + team.lineupSource : ''}`;
     const svg = $('#pitchSvg');
     const color = team.color;
 
     /* 数据坐标（0-100）映射到球场 viewBox（500x640，门将在下方、进攻朝上） */
-    const marks = team.lineup.map(([name, num, p]) => {
+    const marks = start.map(([name, num, p]) => {
       const x = (p.x / 100) * 500;
       const y = 640 * (1 - p.y / 100);
       return `<g class="player-dot">

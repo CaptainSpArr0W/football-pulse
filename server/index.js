@@ -106,6 +106,8 @@ app.get('/api/team/:id', async (req, res) => {
       const got = squads.lineupFor(team);
       if (got && got.lineup.length) {
         team.lineup = got.lineup;
+        team.starting11 = got.starting11;
+        team.formation = got.formation || team.formation;
         team.lineupSource = got.source;
       }
     }

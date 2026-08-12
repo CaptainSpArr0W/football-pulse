@@ -153,14 +153,74 @@ async function refreshTick() {
   }
 }
 
-/* 匹配球队（team 含 en/name/league）→ lineup 格式 [[name, num, {pos}], ...] */
+/* 从阵容中选首发 11 人并按标准阵型排布：门将 1 + 后卫/中场/前锋（总数 10）
+ * 规则按常见阵型匹配（4-3-3 / 4-4-2 / 4-2-3-1 / 3-5-2 / 3-4-3 / 5-3-2 / 4-5-1），
+ * 球员按号码优先排序；阵型站位 y 固定线位（门将 10 / 后卫 28 / 中场 52 / 前锋 78），x 线内均匀展开 */
+const FORMATION_RULES = [
+  { d: 4, m: 3, f: 3, label: '4-3-3' },
+  { d: 4, m: 4, f: 2, label: '4-4-2' },
+  { d: 4, m: 2, f: 3, label: '4-2-3-1' },
+  { d: 3, m: 5, f: 2, label: '3-5-2' },
+  { d: 3, m: 4, f: 3, label: '3-4-3' },
+  { d: 5, m: 3, f: 2, label: '5-3-2' },
+  { d: 4, m: 5, f: 1, label: '4-5-1' },
+];
+const LINE_Y = { 门将: 10, 后卫: 28, 中场: 52, 前锋: 78 };
+
+function pickStarting11(list) {
+  const byPos = { 门将: [], 后卫: [], 中场: [], 前锋: [] };
+  for (const p of list) {
+    const g = byPos[p.pos] ? p.pos : '中场';
+    byPos[g].push(p);
+  }
+  for (const k of Object.keys(byPos)) byPos[k].sort((a, b) => (b.num || 0) - (a.num || 0));
+  const gk = byPos.门将.slice(0, 1);
+  let rule = FORMATION_RULES.find((r) =>
+    byPos.后卫.length >= r.d && byPos.中场.length >= r.m && byPos.前锋.length >= r.f);
+  if (!rule) {
+    const d = Math.min(4, byPos.后卫.length);
+    const m = Math.min(3, byPos.中场.length);
+    rule = { d, m, f: Math.max(0, 10 - d - m), label: `${d}-${m}-${Math.max(0, 10 - d - m)}` };
+  }
+  let d = byPos.后卫.slice(0, rule.d);
+  let m = byPos.中场.slice(0, rule.m);
+  let f = byPos.前锋.slice(0, rule.f);
+  /* 位置人数不足时，用其余位置补足 10 人（后卫不足→中场补，中场不足→后卫/前锋补） */
+  let need = 10 - d.length - m.length - f.length;
+  while (need > 0) {
+    const rest = byPos.后卫.slice(d.length).concat(byPos.中场.slice(m.length), byPos.前锋.slice(f.length));
+    const pick = rest.shift();
+    if (!pick) break;
+    if (pick.pos === '后卫') d.push(pick);
+    else if (pick.pos === '前锋') f.push(pick);
+    else m.push(pick);
+    need--;
+  }
+  /* 线内均匀分布生成站位 */
+  const lineup = [];
+  const place = (group, players) => {
+    const n = players.length;
+    const y = LINE_Y[group];
+    players.forEach((p, i) => {
+      const x = n === 1 ? 50 : Math.round(18 + (64 * i) / (n - 1));
+      lineup.push([p.name, p.num || 0, { pos: p.pos || group, x, y }]);
+    });
+  };
+  place('门将', gk);
+  place('后卫', d);
+  place('中场', m);
+  place('前锋', f);
+  return { lineup, formation: rule.label };
+}
+
+/* 匹配球队（team 含 en/name/league）→ 完整阵容 + 首发 11 人阵型排布 */
 function lineupFor(team) {
   if (!team) return null;
   const keys = [team.en, team.name].map(norm).filter((k) => k && k.length > 2);
   const matchIn = (index) => {
     for (const k of keys) {
       if (index[k]) return index[k];
-      /* 包含匹配：FBref/快照名 与 站点英文名 规范化后互相包含（如 arsenal ⊆ arsenalfc） */
+      /* 包含匹配：Fotmob/快照名 与 站点英文名 规范化后互相包含（如 arsenal ⊆ arsenalfc） */
       for (const ik of Object.keys(index)) {
         if (ik.includes(k) || k.includes(ik)) {
           if (Math.abs(ik.length - k.length) <= 12) return index[ik];
@@ -170,27 +230,16 @@ function lineupFor(team) {
     return null;
   };
   let list = matchIn(loadCurrent().teams);
+  const isCurrent = !!list && list.length > 0;
   if (!list || !list.length) list = matchIn(loadSnapshot().teams);
   if (!list || !list.length) return null;
-  const src = loadCurrent().updatedAt && matchIn(loadCurrent().teams) ? 'Fotmob 当前赛季（2026-27）' : '2025-26 上赛季快照';
-  /* 按位置生成球场坐标（门将靠下、前锋靠上），位置内横向均匀分布 */
-  const POS_Y = { 门将: 8, 后卫: 32, 中场: 58, 前锋: 82 };
-  const groups = {};
-  list.slice(0, 30).forEach((p) => {
-    const g = POS_Y[p.pos] != null ? p.pos : '中场';
-    if (!groups[g]) groups[g] = [];
-    groups[g].push(p);
-  });
-  const lineup = [];
-  for (const g of Object.keys(groups)) {
-    const y = POS_Y[g];
-    const n = groups[g].length;
-    groups[g].forEach((p, i) => {
-      lineup.push([p.name, p.num || 0, { pos: p.pos || g, x: Math.round((100 * (i + 1)) / (n + 1)), y }]);
-    });
-  }
+  const src = isCurrent ? 'Fotmob 当前赛季（2026-27）' : '2025-26 上赛季快照';
+  const full = list.slice(0, 30).map((p) => [p.name, p.num || 0, { pos: p.pos || '' }]);
+  const start = pickStarting11(list);
   return {
-    lineup,
+    lineup: full,
+    starting11: start.lineup,
+    formation: start.formation,
     source: src,
     count: list.length,
   };
