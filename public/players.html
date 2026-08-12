@@ -33,9 +33,16 @@
   <main class="wrap">
 
     <section class="page-head">
-      <h1 id="pageTitle">英超球员数据</h1>
+      <h1 id="pageTitle">五大联赛球员数据</h1>
       <p class="page-sub" id="pageSub">加载中…</p>
       <div class="filter-bar">
+        <div class="filters" id="leagueFilters" role="tablist">
+          <button class="filter-chip active" data-league="ENG">英超</button>
+          <button class="filter-chip" data-league="ESP">西甲</button>
+          <button class="filter-chip" data-league="GER">德甲</button>
+          <button class="filter-chip" data-league="ITA">意甲</button>
+          <button class="filter-chip" data-league="FRA">法甲</button>
+        </div>
         <div class="filters" id="posFilters" role="tablist">
           <button class="filter-chip active" data-pos="">全部</button>
           <button class="filter-chip" data-pos="门将">门将</button>
@@ -49,6 +56,8 @@
             <option value="gls">进球</option>
             <option value="ast">助攻</option>
             <option value="ga">进球+助攻</option>
+            <option value="xg">预期进球 xG</option>
+            <option value="xa">预期助攻 xA</option>
             <option value="mp">出场</option>
             <option value="min">出场时间</option>
             <option value="sh90">每90分钟射门</option>
@@ -67,7 +76,7 @@
             <tr>
               <th>评分</th><th>球员</th><th>国籍</th><th>位置</th><th>球队</th><th>年龄</th>
               <th>出场</th><th>首发</th><th>时间</th><th>进球</th><th>助攻</th><th>G+A</th>
-              <th>射门</th><th>射正</th><th>射正率</th><th>每90射门</th>
+              <th>xG</th><th>xA</th><th>射门</th><th>射正</th><th>射正率</th><th>每90射门</th>
             </tr>
           </thead>
           <tbody id="playersBody"></tbody>

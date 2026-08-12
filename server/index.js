@@ -152,11 +152,21 @@ app.get('/api/standings', async (req, res) => {
   }
 });
 
-/* 英超球员数据（FBref 2025-26 赛季静态快照；?sort=score|gls|ast|mp|sh90|sot&pos=前锋&q=搜索&limit=N） */
+/* 五大联赛球员数据（FBref + Understat 2025-26 赛季静态快照；?league=ENG|ESP|GER|ITA|FRA&sort=score|gls|ast|xg|mp&pos=前锋&q=搜索&limit=N） */
 app.get('/api/players', (req, res) => {
   try {
-    const data = require('./data/players-pl-2025.json');
-    const SORTS = { score: 'score', gls: 'gls', ast: 'ast', ga: 'ga', mp: 'mp', min: 'min', sh90: 'sh90', sot: 'sot' };
+    const LEAGUES = {
+      ENG: { name: '英超', file: 'players-ENG-2025.json' },
+      ESP: { name: '西甲', file: 'players-ESP-2025.json' },
+      GER: { name: '德甲', file: 'players-GER-2025.json' },
+      ITA: { name: '意甲', file: 'players-ITA-2025.json' },
+      FRA: { name: '法甲', file: 'players-FRA-2025.json' },
+    };
+    const league = String(req.query.league || 'ENG').toUpperCase();
+    const cfg = LEAGUES[league];
+    if (!cfg) return res.status(400).json({ error: `未知联赛：${league}` });
+    const data = require(`./data/${cfg.file}`);
+    const SORTS = { score: 'score', gls: 'gls', ast: 'ast', ga: 'ga', xg: 'xg', xa: 'xa', mp: 'mp', min: 'min', sh90: 'sh90', sot: 'sot' };
     const sort = SORTS[req.query.sort] || 'score';
     const pos = req.query.pos || '';
     const q = String(req.query.q || '').toLowerCase();
@@ -164,9 +174,9 @@ app.get('/api/players', (req, res) => {
     let list = data.players.slice();
     if (pos) list = list.filter((p) => p.pos.includes(pos));
     if (q) list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.squad || '').toLowerCase().includes(q));
-    list.sort((a, b) => b[sort] - a[sort]);
+    list.sort((a, b) => (b[sort] || 0) - (a[sort] || 0));
     res.json({
-      season: data.season, league: data.league, source: data.source, updatedAt: data.updatedAt,
+      season: data.season, league: cfg.name, code: league, source: data.source, updatedAt: data.updatedAt,
       total: data.players.length, filtered: list.length, players: list.slice(0, limit),
     });
   } catch (err) {

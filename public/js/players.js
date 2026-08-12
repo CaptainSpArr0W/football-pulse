@@ -1,13 +1,13 @@
-/* 球员数据页：FBref 英超 2025-26 赛季快照 */
+/* 球员数据页：五大联赛 FBref + Understat 2025-26 赛季快照 */
 (function () {
-  const state = { pos: '', sort: 'score', q: '' };
+  const state = { league: 'ENG', pos: '', sort: 'score', q: '' };
   const $ = (id) => document.getElementById(id);
   let debounceTimer = null;
 
   const fmt = (v, d = 0) => (v == null || isNaN(v) ? '--' : Number(v).toFixed(d));
   const fmtMin = (v) => (v ? String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '--');
+  const xgCell = (v) => (v == null || isNaN(v) || v === 0 ? '<td class="p-dim">--</td>' : `<td class="p-xg">${fmt(v, 2)}</td>`);
 
-  /* 评分颜色 */
   function scoreColor(s) {
     if (s >= 85) return '#2e7d32';
     if (s >= 70) return '#2e7d32';
@@ -16,7 +16,7 @@
   }
 
   async function load() {
-    const qs = new URLSearchParams({ sort: state.sort, limit: 300 });
+    const qs = new URLSearchParams({ league: state.league, sort: state.sort, limit: 300 });
     if (state.pos) qs.set('pos', state.pos);
     if (state.q) qs.set('q', state.q);
     try {
@@ -26,7 +26,7 @@
       $('pageSub').textContent = `${data.league} ${data.season} 赛季 · 数据来源 ${data.source} · 更新于 ${new Date(data.updatedAt).toLocaleString('zh-CN')}`;
       $('playersMeta').textContent = `共 ${data.total} 名球员，当前显示 ${data.filtered} 名（按${sortName(state.sort)}排序）`;
       render(data.players);
-      $('playersNote').textContent = '综合评分由进球、助攻、效率与出场时间加权计算；跑动进阶数据（Progressive Carries 等）在 FBref 免费版不可用。';
+      $('playersNote').textContent = '综合评分由进球、助攻、效率、xG 与出场时间加权计算；xG/xA 来自 Understat（经 soccerdata 抓取）。';
     } catch (err) {
       $('playersBody').innerHTML = '';
       $('playersEmpty').hidden = false;
@@ -35,7 +35,7 @@
   }
 
   function sortName(s) {
-    return { score: '综合评分', gls: '进球', ast: '助攻', ga: '进球+助攻', mp: '出场', min: '出场时间', sh90: '每90分钟射门', sot: '射正' }[s] || s;
+    return { score: '综合评分', gls: '进球', ast: '助攻', ga: '进球+助攻', xg: '预期进球 xG', xa: '预期助攻 xA', mp: '出场', min: '出场时间', sh90: '每90分钟射门', sot: '射正' }[s] || s;
   }
 
   function render(list) {
@@ -55,6 +55,8 @@
         <td class="p-hot">${p.gls}</td>
         <td class="p-hot">${p.ast}</td>
         <td>${p.ga}</td>
+        ${xgCell(p.xg)}
+        ${xgCell(p.xa)}
         <td>${p.sh || '--'}</td>
         <td>${p.sot || '--'}</td>
         <td>${fmt(p.sotPct, 1)}%</td>
@@ -62,7 +64,16 @@
       </tr>`).join('');
   }
 
-  /* 事件 */
+  /* 联赛切换 */
+  $('leagueFilters').addEventListener('click', (e) => {
+    const chip = e.target.closest('.filter-chip');
+    if (!chip) return;
+    document.querySelectorAll('#leagueFilters .filter-chip').forEach((c) => c.classList.toggle('active', c === chip));
+    state.league = chip.dataset.league;
+    load();
+  });
+
+  /* 位置切换 */
   $('posFilters').addEventListener('click', (e) => {
     const chip = e.target.closest('.filter-chip');
     if (!chip) return;

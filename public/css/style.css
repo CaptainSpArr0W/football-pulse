@@ -826,3 +826,5 @@ img.crest, img.crest-big { object-fit: cover; }
 .players-table .p-hot { font-weight: 700; color: #0f766e; }
 .score-badge { display: inline-block; min-width: 34px; text-align: center; padding: 3px 6px; border-radius: 6px; color: #fff; font-weight: 700; font-size: 12.5px; }
 .players-note { font-size: 12px; color: var(--muted, #94a3b8); margin-top: 10px; }
+.players-table .p-xg { font-weight: 600; color: #6d28d9; }
+.players-table .p-dim { color: #cbd5e1; }
