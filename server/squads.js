@@ -63,7 +63,7 @@ let current = null;
 function loadCurrent() {
   if (current) return current;
   try { current = JSON.parse(fs.readFileSync(CURRENT_FILE, 'utf8')); }
-  catch (_) { current = { teams: {}, teamEn: {}, source: 'Fotmob 当前赛季', updatedAt: 0 }; }
+  catch (_) { current = { teams: {}, teamEn: {}, formations: {}, starting: {}, source: 'Fotmob 当前赛季', updatedAt: 0 }; }
   return current;
 }
 function saveCurrent() {
@@ -108,7 +108,8 @@ async function fetchLeague(leagueZh) {
     const en = r.name || r.shortName;
     const key = norm(en);
     if (!key || !r.id) continue;
-    if (cur.teams[key] && cur.teams[key].length) continue; // 已有数据跳过
+    /* 已有完整数据（阵容+阵型+首发）则跳过；缺阵型/首发的旧数据重新补抓 */
+    if (cur.teams[key] && cur.teams[key].length && cur.formations[key] && cur.starting[key]) continue;
     try {
       const tj = await fmGet(`/teams?id=${r.id}`, 6 * 3600 * 1000);
       const groups = tj.squad && tj.squad.squad;
@@ -129,8 +130,22 @@ async function fetchLeague(leagueZh) {
       if (players.length >= 5) {
         cur.teams[key] = players;
         cur.teamEn[key] = en;
+        /* 最近一场比赛的阵型与首发（Fotmob lastLineupStats，用户要求：阵型按各队实际数据） */
+        try {
+          const lls = tj.overview && tj.overview.lastLineupStats;
+          if (lls && lls.formation) {
+            cur.formations[key] = String(lls.formation);
+            if (Array.isArray(lls.starters) && lls.starters.length >= 5) {
+              cur.starting[key] = lls.starters.slice(0, 11).map((p) => ({
+                name: p.name || '',
+                num: p.shirtNumber || 0,
+                positionId: Number(p.positionId) || 0,
+              }));
+            }
+          }
+        } catch (_) { /* 阵型缺失不影响 */ }
         filled++;
-        log(`${leagueZh} ${en}：${players.length} 人`);
+        log(`${leagueZh} ${en}：${players.length} 人，阵型 ${cur.formations[key] || '无'}`);
       }
     } catch (_) { /* 单队失败跳过 */ }
   }
@@ -153,9 +168,78 @@ async function refreshTick() {
   }
 }
 
-/* 从阵容中选首发 11 人并按标准阵型排布：门将 1 + 后卫/中场/前锋（总数 10）
- * 规则按常见阵型匹配（4-3-3 / 4-4-2 / 4-2-3-1 / 3-5-2 / 3-4-3 / 5-3-2 / 4-5-1），
- * 球员按号码优先排序；阵型站位 y 固定线位（门将 10 / 后卫 28 / 中场 52 / 前锋 78），x 线内均匀展开 */
+/* Fotmob positionId 分档：11=GK，20-39=后卫，40-79=中场，80+=前锋（与 match 阵容一致） */
+function fmPosOf(pid) {
+  const p = Number(pid);
+  if (p === 11) return '门将';
+  if (p >= 20 && p <= 39) return '后卫';
+  if (p >= 40 && p <= 79) return '中场';
+  if (p >= 80) return '前锋';
+  return '中场';
+}
+
+/* 解析阵型字符串 → {df, mids:[...], fw}，如 "4-2-3-1" → {df:4, mids:[2,3], fw:1}；失败返回 null */
+function parseFormation(fmt) {
+  if (!fmt) return null;
+  const nums = String(fmt).trim().split(/\s*-\s*/).map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n >= 0);
+  if (nums.length < 3) return null;
+  const sum = nums.reduce((a, b) => a + b, 0);
+  if (sum !== 10) return null;
+  const df = nums[0];
+  const fw = nums[nums.length - 1];
+  const mids = nums.slice(1, -1);
+  return { df, mids, fw };
+}
+
+/* 按真实阵型 + Fotmob 最近一场首发站位：多层中场逐层排布（4-2-3-1：双后腰+三前腰） */
+function buildFromFormation(starters, formation) {
+  const byPos = { 门将: [], 后卫: [], 中场: [], 前锋: [] };
+  for (const p of starters) {
+    const g = byPos[fmPosOf(p.positionId)] ? fmPosOf(p.positionId) : '中场';
+    byPos[g].push(p);
+  }
+  const rule = parseFormation(formation) || { df: 4, mids: [3], fw: 3 };
+  const gk = byPos.门将.slice(0, 1);
+  let d = byPos.后卫.slice(0, rule.df);
+  let f = byPos.前锋.slice(0, rule.fw);
+  let midsAll = byPos.中场.slice(0, rule.mids.reduce((a, b) => a + b, 0));
+  /* 位置不足时补足：后卫/中场/前锋互相补充至 10 人 */
+  let need = 10 - gk.length - d.length - midsAll.length - f.length;
+  const restPool = byPos.后卫.slice(d.length).concat(byPos.中场.slice(midsAll.length), byPos.前锋.slice(f.length));
+  while (need > 0 && restPool.length) {
+    const pick = restPool.shift();
+    if (pick && pick.positionId >= 80) f.push(pick);
+    else if (pick && pick.positionId >= 20 && pick.positionId <= 39) d.push(pick);
+    else midsAll.push(pick);
+    need--;
+  }
+  /* 多层线位：门将 10 / 后卫 30 / 中场按层 44-62 / 前锋 78 */
+  const lineup = [];
+  const placeRow = (players, y) => {
+    const n = players.length;
+    players.forEach((p, i) => {
+      const x = n === 1 ? 50 : Math.round(18 + (64 * i) / (n - 1));
+      lineup.push([p.name || '', p.num || 0, { pos: fmPosOf(p.positionId), x, y }]);
+    });
+  };
+  placeRow(gk, 10);
+  placeRow(d, 30);
+  const layers = rule.mids.length || 1;
+  midsAll.forEach((p, i) => {
+    const perLayer = Math.ceil(midsAll.length / layers);
+    const layer = Math.min(layers - 1, Math.floor(i / perLayer));
+    const y = layers === 1 ? 52 : (layers === 2 ? (layer === 0 ? 44 : 62) : [38, 52, 66][layer]);
+    const row = midsAll.filter((_, j) => Math.min(layers - 1, Math.floor(j / perLayer)) === layer);
+    const idx = row.indexOf(p);
+    const x = row.length === 1 ? 50 : Math.round(18 + (64 * idx) / (row.length - 1));
+    lineup.push([p.name || '', p.num || 0, { pos: '中场', x, y }]);
+  });
+  placeRow(f, 78);
+  return { lineup, formation: `${rule.df}-${rule.mids.join('-')}-${rule.fw}` };
+}
+
+/* 从阵容中选首发 11 人并按标准阵型排布（无真实阵型时的兜底）：
+ * 门将 1 + 后卫/中场/前锋（总数 10），球员按号码优先排序 */
 const FORMATION_RULES = [
   { d: 4, m: 3, f: 3, label: '4-3-3' },
   { d: 4, m: 4, f: 2, label: '4-4-2' },
@@ -229,13 +313,30 @@ function lineupFor(team) {
     }
     return null;
   };
-  let list = matchIn(loadCurrent().teams);
+  const cur = loadCurrent();
+  const matchKey = (() => {
+    for (const k of keys) {
+      if (cur.teams[k]) return k;
+      for (const ik of Object.keys(cur.teams)) {
+        if (ik.includes(k) || k.includes(ik)) {
+          if (Math.abs(ik.length - k.length) <= 12) return ik;
+        }
+      }
+    }
+    return null;
+  })();
+  let list = matchKey ? cur.teams[matchKey] : null;
   const isCurrent = !!list && list.length > 0;
   if (!list || !list.length) list = matchIn(loadSnapshot().teams);
   if (!list || !list.length) return null;
   const src = isCurrent ? 'Fotmob 当前赛季（2026-27）' : '2025-26 上赛季快照';
   const full = list.slice(0, 30).map((p) => [p.name, p.num || 0, { pos: p.pos || '' }]);
-  const start = pickStarting11(list);
+  /* 优先：Fotmob 最近一场真实阵型 + 首发；兜底：按位置规则排布 */
+  let start = null;
+  if (isCurrent && matchKey && cur.starting[matchKey] && cur.starting[matchKey].length >= 5) {
+    start = buildFromFormation(cur.starting[matchKey], cur.formations[matchKey]);
+  }
+  if (!start || start.lineup.length < 11) start = pickStarting11(list);
   return {
     lineup: full,
     starting11: start.lineup,
