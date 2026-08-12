@@ -270,6 +270,26 @@
     setTimeout(() => el.classList.remove('score-flash'), 750);
   }
 
+  /* ---------- 模型预测（Dixon-Coles + 赔率融合） ---------- */
+  async function renderPrediction(m) {
+    const section = $('#predSection');
+    const wrap = $('#predWrap');
+    if (m.status !== 'upcoming') { section.hidden = true; return; }
+    try {
+      const res = await fetch('/api/predictions?date=' + encodeURIComponent(m.date));
+      const j = await res.json();
+      const found = (j.predictions || []).find((p) => String(p.id) === String(m.id) || String(p.id) === String(matchId));
+      if (found) {
+        section.hidden = false;
+        wrap.innerHTML = predPanel(found.pred);
+        const note = wrap.querySelector('.pred-src');
+        if (note && found.pred.fused) note.textContent = '已融合 ODDS 网站最新赔率 · Dixon-Coles';
+      } else {
+        section.hidden = true;
+      }
+    } catch (_) { section.hidden = true; }
+  }
+
   /* ---------- 初始化 ---------- */
   async function fetchMatch() {
     const res = await fetch(`/api/match/${encodeURIComponent(matchId)}`);
@@ -293,6 +313,7 @@
       renderHalfReport(match);
     }
     renderOdds(match);
+    renderPrediction(match);
     renderLineups(match);
     renderRecent(match);
     renderH2h(match);

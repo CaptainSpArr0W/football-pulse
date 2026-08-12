@@ -130,8 +130,52 @@ function asianLine(diff) {
   return best;
 }
 
-/* 每 90 分钟预期进球 + 预测 */
-function predictMatch(competition, homeZh, awayZh) {
+/* ---------- 赔率融合：把 ODDS 网站最新赔率（隐含概率去水）与模型概率按 5:5 融合 ---------- */
+const MARKET_WEIGHT = 0.5;
+
+/* 欧赔 → [主胜, 平, 客胜] 隐含概率（去水归一化） */
+function europeImplied(odds) {
+  const e = odds && odds.europe && odds.europe.find((o) => o.open !== false);
+  if (!e || !(e.home > 1) || !(e.draw > 1) || !(e.away > 1)) return null;
+  const raw = [1 / e.home, 1 / e.draw, 1 / e.away];
+  const s = raw[0] + raw[1] + raw[2];
+  return s > 0 ? raw.map((v) => v / s) : null;
+}
+/* 大小球盘口 → over 隐含概率（取最接近 line 的盘口） */
+function totalImplied(odds, line) {
+  const arr = odds && odds.total;
+  if (!arr || !arr.length) return null;
+  let best = null, bd = Infinity;
+  for (const o of arr) {
+    if (o.line == null) continue;
+    const d = Math.abs(o.line - line);
+    if (d < bd) { bd = d; best = o; }
+  }
+  if (!best || !(best.over > 1) || !(best.under > 1)) return null;
+  const po = 1 / best.over, pu = 1 / best.under;
+  const s = po + pu;
+  return s > 0 ? { pOver: po / s, marketLine: best.line } : null;
+}
+/* 亚盘 → 主队赢盘隐含概率（取最接近模型让球线的盘口） */
+function asianImplied(odds, line) {
+  const arr = odds && odds.asian;
+  if (!arr || !arr.length) return null;
+  let best = null, bd = Infinity;
+  for (const o of arr) {
+    if (o.line == null) continue;
+    const d = Math.abs(o.line - line);
+    if (d < bd) { bd = d; best = o; }
+  }
+  if (!best || !(best.home > 1) || !(best.away > 1)) return null;
+  const ph = 1 / best.home, pa = 1 / best.away;
+  const s = ph + pa;
+  return s > 0 ? { pHome: ph / s, marketLine: best.line } : null;
+}
+
+const blend = (a, b) => (b == null ? a : a * (1 - MARKET_WEIGHT) + b * MARKET_WEIGHT);
+
+/* 每 90 分钟预期进球 + 预测（odds 为可选的最新赔率，用于融合校准） */
+function predictMatch(competition, homeZh, awayZh, odds) {
   const code = COMP_CODE[competition];
   if (!code || !MODELS[code]) return null;
   const model = MODELS[code];
@@ -154,40 +198,54 @@ function predictMatch(competition, homeZh, awayZh) {
   const la = Math.max(0.05, model.muAway * Math.exp(attA - defH));
   const M = scoreMatrix(lh, la);
 
-  /* 胜平负 */
+  /* 胜平负（模型 + 欧赔融合） */
   let pHome = 0, pDraw = 0, pAway = 0;
   for (let i = 0; i <= MAX_GOALS; i++) for (let j = 0; j <= MAX_GOALS; j++) {
     if (i > j) pHome += M[i][j];
     else if (i === j) pDraw += M[i][j];
     else pAway += M[i][j];
   }
+  let fused = false;
+  const eImpl = europeImplied(odds);
+  if (eImpl) {
+    pHome = blend(pHome, eImpl[0]);
+    pDraw = blend(pDraw, eImpl[1]);
+    pAway = blend(pAway, eImpl[2]);
+    fused = true;
+  }
   const x12 = [['主胜', pHome], ['平局', pDraw], ['客胜', pAway]]
     .map(([k, v]) => ({ label: k, prob: Math.round(v * 1000) / 10 }))
     .sort((a, b) => b.prob - a.prob);
   const x12Pick = x12[0];
 
-  /* 大小球 2.5 */
+  /* 大小球 2.5（模型 + 大小盘口融合） */
   let pOver = 0;
   for (let i = 0; i <= MAX_GOALS; i++) for (let j = 0; j <= MAX_GOALS; j++) if (i + j >= 3) pOver += M[i][j];
+  let ouLine = 2.5;
+  const tImpl = totalImplied(odds, 2.5);
+  if (tImpl) { pOver = blend(pOver, tImpl.pOver); ouLine = tImpl.marketLine || 2.5; fused = true; }
   const ou = {
-    line: 2.5,
+    line: ouLine,
     over: Math.round(pOver * 1000) / 10,
     under: Math.round((1 - pOver) * 1000) / 10,
     pick: pOver >= 0.5 ? '大' : '小',
   };
 
-  /* 亚盘（主队视角） */
-  const line = asianLine(lh - la);
+  /* 亚盘（主队视角；模型让球线 + 市场盘口融合） */
+  let line = asianLine(lh - la);
+  const aImpl = asianImplied(odds, line);
+  if (aImpl) { line = aImpl.marketLine; fused = true; }
+  const lineText = line === 0 ? '平手' : line < 0 ? `主让 ${-line}` : `主受 ${line}`;
   let pHomeCover = 0;
   for (let i = 0; i <= MAX_GOALS; i++) for (let j = 0; j <= MAX_GOALS; j++) {
     const hh = i + (line < 0 ? line : 0);
     const aa = j + (line > 0 ? line : 0);
     if (hh > aa) pHomeCover += M[i][j];
-    /* 平半/半球类只分胜负；整数盘平局走盘，此处归入走盘不计 */
   }
+  if (aImpl) pHomeCover = blend(pHomeCover, aImpl.pHome);
   const asian = {
     line,
-    lineText: line === 0 ? '平手' : line < 0 ? `主让 ${-line}` : `主受 ${line}`,
+    lineText,
     homeCover: Math.round(pHomeCover * 1000) / 10,
     awayCover: Math.round((1 - pHomeCover) * 1000) / 10,
     pick: pHomeCover >= 0.5 ? '主队' : '客队',
@@ -199,6 +257,7 @@ function predictMatch(competition, homeZh, awayZh) {
     x12, x12Pick,
     ou,
     asian,
+    fused, // 是否已融合最新赔率
   };
 }
 
@@ -217,14 +276,24 @@ function saveLog() {
 }
 function logPrediction(entry) {
   const log = loadLog();
-  if (log.records.some((r) => r.id === entry.id)) return; // 已记录
-  log.records.push(entry);
+  const idx = log.records.findIndex((r) => r.id === entry.id);
+  if (idx >= 0) {
+    /* 已记录：仅更新预测字段（未结算前允许随赔率调整），保留结算字段 */
+    const r = log.records[idx];
+    if (r.settled) return;
+    Object.assign(r, entry, { actual: r.actual, settled: r.settled, hitX12: r.hitX12, hitOU: r.hitOU, hitAsian: r.hitAsian });
+    r.updates = (r.updates || 0) + 1;
+  } else {
+    entry.updates = 0;
+    log.records.push(entry);
+  }
   saveLog();
 }
 
-/* 缓存（1 小时） */
+/* 缓存（1 小时；赔率更新后调用 invalidateCache 强制重算） */
 let cache = { ts: 0, data: {} };
 const CACHE_MS = 3600 * 1000;
+function invalidateCache() { cache = { ts: 0, data: {} }; }
 
 function predictionsForDate(dateStr, matches) {
   const now = Date.now();
@@ -235,7 +304,7 @@ function predictionsForDate(dateStr, matches) {
     if (m.status !== 'upcoming') continue;
     const hName = m._homeName || (m.home && m.home.name);
     const aName = m._awayName || (m.away && m.away.name);
-    const pred = predictMatch(m.competition, hName, aName);
+    const pred = predictMatch(m.competition, hName, aName, m.odds);
     if (pred) {
       out.push({ id: m.id, competition: m.competition, home: hName, away: aName, pred });
       logPrediction({
@@ -246,12 +315,32 @@ function predictionsForDate(dateStr, matches) {
         predOU: pred.ou.pick, overProb: pred.ou.over, underProb: pred.ou.under,
         asianLine: pred.asian.lineText, predAsian: pred.asian.pick,
         predAsianHome: pred.asian.homeCover, predAsianAway: pred.asian.awayCover,
+        fused: pred.fused || false,
         actual: null, settled: false, hitX12: null, hitOU: null, hitAsian: null,
       });
     }
   }
   cache.data[dateStr] = out;
   return out;
+}
+
+/* 双节点更新：赔率刷新（早盘/临场）后，用最新赔率重新预测并更新日志（未结算） */
+function refreshWithOdds(matches) {
+  const log = loadLog();
+  let changed = 0;
+  const byDate = {};
+  for (const m of matches) {
+    if (m.status !== 'upcoming') continue;
+    const d = m.date;
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(m);
+  }
+  invalidateCache();
+  for (const d of Object.keys(byDate)) {
+    predictionsForDate(d, byDate[d]); // 重算 + upsert 日志
+    changed += byDate[d].length;
+  }
+  return changed;
 }
 
 /* 赛后结算：回填实际比分并判定三项命中（幂等，仅未结算记录） */
@@ -321,4 +410,4 @@ function exportCsv() {
   }).join(',')).join('\r\n');
 }
 
-module.exports = { predictMatch, predictionsForDate, settleFinishedMatches, exportCsv, zhToEn };
+module.exports = { predictMatch, predictionsForDate, refreshWithOdds, settleFinishedMatches, exportCsv, zhToEn };

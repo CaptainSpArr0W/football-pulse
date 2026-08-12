@@ -74,10 +74,18 @@
     <!-- 赔率（无赔率数据源时整块隐藏） -->
     <section>
       <div class="section-title">
-        <h2>赔率数据</h2>
+        <h2>赔率</h2>
         <span class="section-note">欧赔 / 亚盘 / 大小球 / 角球 · 数据来源 API-Football</span>
       </div>
       <div class="match-card odds-only" id="oddsWrap"></div>
+    </section>
+
+    <section id="predSection" hidden>
+      <div class="section-title">
+        <h2>模型预测</h2>
+        <span class="section-note">Dixon-Coles 泊松模型 · 2025-26 数据拟合 · 融合 ODDS 网站最新赔率</span>
+      </div>
+      <div class="match-card odds-only" id="predWrap"></div>
     </section>
 
     <!-- 双方阵容 -->

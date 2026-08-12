@@ -110,6 +110,30 @@
     </div>`;
   }
 
+  /* 本场预测（模型 + 赔率融合），展示在实力分区下方 */
+  function predHtml(matchId) {
+    const pred = (window.__predMap || {})[matchId];
+    if (!pred) return '';
+    const pct = (v) => (v == null ? '--' : `${v}%`);
+    const bar = (v) => `<span class="pred-bar"><i style="width:${Math.min(v, 100)}%"></i></span>`;
+    const x12 = (pred.x12 || []).map((x) => `
+      <span class="pred-cell${x.label === pred.x12Pick.label ? ' is-pick' : ''}">
+        <em>${esc(x.label)}</em><b>${pct(x.prob)}</b>${bar(x.prob)}
+      </span>`).join('');
+    const fusedTip = pred.fused ? '已融合最新赔率' : '模型初值';
+    return `<div class="pv-section">
+      <div class="pv-section-title"><b>模型预测</b><span class="pv-note">Dixon-Coles · ${fusedTip} · 期望 ${pred.expGoals.home}:${pred.expGoals.away}</span></div>
+      <div class="pv-pred">
+        <div class="pv-pred-label">胜平负 · 推荐 <b>${esc(pred.x12Pick.label)}</b> ${pct(pred.x12Pick.prob)}</div>
+        <div class="pred-x12">${x12}</div>
+        <div class="pv-pred-two">
+          <div class="pv-pred-cell">大小球（${pred.ou.line}）· 推荐 <b>${esc(pred.ou.pick)}</b> ${pct(pred.ou.pick === '大' ? pred.ou.over : pred.ou.under)}</div>
+          <div class="pv-pred-cell">亚盘（${esc(pred.asian.lineText)}）· 推荐 <b>${esc(pred.asian.pick)}</b> ${pct(pred.asian.pick === '主队' ? pred.asian.homeCover : pred.asian.awayCover)}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
   function render(data) {
     const m = data.match;
     if (!m) return;
@@ -130,6 +154,7 @@
         </div>
       </div>
       ${section('实力分区', '基于上赛季联赛排名（ESPN）', powerHtml('home', data.power.home), powerHtml('away', data.power.away))}
+      ${predHtml(m.id)}
       ${section('xG', '本场预期进球（Fotmob）', xgHtml(m, 'home'), xgHtml(m, 'away'))}
       ${section('近六场综合', '两队在各自联赛近六场进/失球合计', formHtml(data.form.home), formHtml(data.form.away))}
       ${section('首发阵容', lineupNote, lineupHtml(m.homeTeam, data.lineups.home), lineupHtml(m.awayTeam, data.lineups.away))}

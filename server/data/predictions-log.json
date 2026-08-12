@@ -22,7 +22,9 @@
    "settled": false,
    "hitX12": null,
    "hitOU": null,
-   "hitAsian": null
+   "hitAsian": null,
+   "fused": false,
+   "updates": 2
   },
   {
    "id": "f-564633",
@@ -45,7 +47,9 @@
    "settled": false,
    "hitX12": null,
    "hitOU": null,
-   "hitAsian": null
+   "hitAsian": null,
+   "fused": false,
+   "updates": 2
   },
   {
    "id": "f-564632",
@@ -68,7 +72,9 @@
    "settled": false,
    "hitX12": null,
    "hitOU": null,
-   "hitAsian": null
+   "hitAsian": null,
+   "fused": false,
+   "updates": 2
   }
  ]
 }

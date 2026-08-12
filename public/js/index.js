@@ -165,7 +165,8 @@
       const j = await res.json();
       predMap = {};
       (j.predictions || []).forEach((p) => { predMap[p.id] = p.pred; });
-    } catch (_) { predMap = {}; }
+      window.__predMap = predMap; // 供预览弹窗（实力分区下）读取
+    } catch (_) { predMap = {}; window.__predMap = {}; }
   }
   function renderMatchList() {
     const list = visibleMatches();

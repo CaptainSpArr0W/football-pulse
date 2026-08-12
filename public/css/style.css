@@ -850,3 +850,11 @@ img.crest, img.crest-big { object-fit: cover; }
 .pred-pick { font-size: 12px; color: var(--muted, #64748b); margin-top: 6px; }
 .pred-pick b { color: #4338ca; }
 @media (max-width: 640px) { .pred-two { grid-template-columns: 1fr; } }
+
+/* ---------- 预览弹窗：模型预测（实力分区下） ---------- */
+.pv-pred { display: grid; gap: 8px; width: 100%; }
+.pv-pred-label { font-size: 12.5px; color: var(--ink-2, #475569); margin-bottom: 4px; }
+.pv-pred-label b { color: #4338ca; }
+.pv-pred-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.pv-pred-cell { font-size: 12px; color: var(--ink-2, #475569); background: var(--card, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 7px 9px; }
+.pv-pred-cell b { color: #4338ca; }

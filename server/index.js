@@ -331,7 +331,15 @@ setTimeout(() => {
         }
       }
       if (isEarly) earlyRoundKey = today;
-      if (filled || flagged) console.log(`[odds] The Odds API 填充 ${filled} 场 · 异动 ${flagged} 场 · 今日已用 ${dayUsed.count}/${DAILY_CAP} · 本月剩余 ${oddsApi.quotaLeft() || '?'} 次`);
+      if (filled || flagged) {
+        console.log(`[odds] The Odds API 填充 ${filled} 场 · 异动 ${flagged} 场 · 今日已用 ${dayUsed.count}/${DAILY_CAP} · 本月剩余 ${oddsApi.quotaLeft() || '?'} 次`);
+        /* 双节点更新：赔率刷新（早盘/临场）后，用最新赔率重新预测并更新日志 */
+        try {
+          const predictor = require('./predictor');
+          const n = predictor.refreshWithOdds(store.matches);
+          if (n > 0) console.log(`[predict] 已用最新赔率重新预测 ${n} 场（胜平负/大小球/亚盘融合校准）`);
+        } catch (e) { console.log('[predict] 赔率融合刷新失败:', e.message); }
+      }
     } catch (_) { /* 静默降级 */ }
   }
   setTimeout(oddsLoop, 10 * 1000);
