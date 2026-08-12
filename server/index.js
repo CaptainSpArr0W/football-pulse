@@ -39,6 +39,36 @@ app.get('/api/matches', (req, res) => {
   res.json({ date: date || null, matches: list.map((m) => store._publicMatch(m)) });
 });
 
+/* 五大联赛比赛预测（Dixon-Coles 模型，2025-26 数据拟合；?date=YYYY-MM-DD 默认全部未开赛） */
+app.get('/api/predictions', (req, res) => {
+  try {
+    const predictor = require('./predictor');
+    const date = req.query.date;
+    if (date) {
+      res.json({ date, predictions: predictor.predictionsForDate(date, store.matchesByDate(date)) });
+      return;
+    }
+    const out = [];
+    const byDate = {};
+    for (const m of store.matches) {
+      if (m.status !== 'upcoming') continue;
+      const pm = store._publicMatch(m);
+      m._homeName = pm.home.name;
+      m._awayName = pm.away.name;
+      const d = m.date;
+      if (!byDate[d]) byDate[d] = [];
+      byDate[d].push(m);
+    }
+    for (const d of Object.keys(byDate)) {
+      const p = predictor.predictionsForDate(d, byDate[d]);
+      out.push(...p);
+    }
+    res.json({ predictions: out });
+  } catch (err) {
+    res.status(500).json({ error: `预测生成失败：${err.message}` });
+  }
+});
+
 /* 球队列表 */
 app.get('/api/teams', (req, res) => res.json({ teams: store.teams() }));
 

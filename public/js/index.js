@@ -158,10 +158,19 @@
   }
 
   /* ---------- 比赛列表渲染 ---------- */
+  let predMap = {};
+  async function loadPredictions() {
+    try {
+      const res = await fetch('/api/predictions');
+      const j = await res.json();
+      predMap = {};
+      (j.predictions || []).forEach((p) => { predMap[p.id] = p.pred; });
+    } catch (_) { predMap = {}; }
+  }
   function renderMatchList() {
     const list = visibleMatches();
     const wrap = $('#matchList');
-    wrap.innerHTML = list.map((m, i) => matchCard(m, i)).join('');
+    wrap.innerHTML = list.map((m, i) => matchCard({ ...m, pred: predMap[m.id] }, i)).join('');
     const empty = $('#emptyState');
     empty.hidden = list.length > 0;
     empty.innerHTML = list.length
@@ -310,6 +319,7 @@
       const prevDate = state.selectedDate;
       state.overview = ov;
       state.selectedDate = (ov.dates || []).includes(prevDate) ? prevDate : ov.today;
+      await loadPredictions();
       render();
     } catch (_) { /* 保留当前视图 */ }
   }
@@ -415,6 +425,7 @@
     renderDateNav();
     renderFilters();
     renderSelect();
+    await loadPredictions();
     render();
     $('#refreshBtn').addEventListener('click', refreshData);
     loadStandings(false);

@@ -140,6 +140,44 @@ function oddsTable(match) {
   </div>`;
 }
 
+/* ---------- 比赛预测面板（Dixon-Coles 模型：胜平负 / 大小球 / 亚盘） ---------- */
+function predPanel(pred) {
+  if (!pred) return '';
+  const pct = (v) => (v == null ? '--' : `${v}%`);
+  const bar = (v) => `<span class="pred-bar"><i style="width:${Math.min(v, 100)}%"></i></span>`;
+  const x12 = pred.x12 || [];
+  const rows = x12.map((x) => `
+    <span class="pred-cell${x.label === pred.x12Pick.label ? ' is-pick' : ''}">
+      <em>${esc(x.label)}</em><b>${pct(x.prob)}</b>${bar(x.prob)}
+    </span>`).join('');
+  return `<div class="pred-wrap" data-pred>
+    <div class="pred-head">模型预测 <span class="pred-src">Dixon-Coles · 2025-26 数据拟合</span></div>
+    <div class="pred-block">
+      <div class="pred-label">胜平负</div>
+      <div class="pred-x12">${rows}</div>
+      <div class="pred-pick">推荐 <b>${esc(pred.x12Pick.label)}</b>（${pct(pred.x12Pick.prob)}）· 期望 ${pred.expGoals.home}:${pred.expGoals.away}</div>
+    </div>
+    <div class="pred-block pred-two">
+      <div>
+        <div class="pred-label">大小球（${pred.ou.line}）</div>
+        <div class="pred-ou">
+          <span class="pred-cell${pred.ou.pick === '大' ? ' is-pick' : ''}"><em>大球</em><b>${pct(pred.ou.over)}</b>${bar(pred.ou.over)}</span>
+          <span class="pred-cell${pred.ou.pick === '小' ? ' is-pick' : ''}"><em>小球</em><b>${pct(pred.ou.under)}</b>${bar(pred.ou.under)}</span>
+        </div>
+        <div class="pred-pick">推荐 <b>${esc(pred.ou.pick)}球</b>（${pct(pred.ou.pick === '大' ? pred.ou.over : pred.ou.under)}）</div>
+      </div>
+      <div>
+        <div class="pred-label">亚盘（${esc(pred.asian.lineText)}）</div>
+        <div class="pred-ou">
+          <span class="pred-cell${pred.asian.pick === '主队' ? ' is-pick' : ''}"><em>主队赢盘</em><b>${pct(pred.asian.homeCover)}</b>${bar(pred.asian.homeCover)}</span>
+          <span class="pred-cell${pred.asian.pick === '客队' ? ' is-pick' : ''}"><em>客队赢盘</em><b>${pct(pred.asian.awayCover)}</b>${bar(pred.asian.awayCover)}</span>
+        </div>
+        <div class="pred-pick">推荐 <b>${esc(pred.asian.pick)}</b>（${pct(pred.asian.pick === '主队' ? pred.asian.homeCover : pred.asian.awayCover)}）</div>
+      </div>
+    </div>
+  </div>`;
+}
+
 /* 赔率 Tab 切换（事件委托） */
 document.addEventListener('click', (e) => {
   const tab = e.target.closest('.odds-tab');
@@ -222,6 +260,7 @@ function matchCard(match, index) {
       </div>
     </div>
     ${oddsTable(match)}
+    ${predPanel(match.pred)}
   </div>`;
 }
 

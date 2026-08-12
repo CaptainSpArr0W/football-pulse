@@ -828,3 +828,25 @@ img.crest, img.crest-big { object-fit: cover; }
 .players-note { font-size: 12px; color: var(--muted, #94a3b8); margin-top: 10px; }
 .players-table .p-xg { font-weight: 600; color: #6d28d9; }
 .players-table .p-dim { color: #cbd5e1; }
+
+/* ---------- 比赛预测面板 ---------- */
+.pred-wrap { margin-top: 12px; border: 1px dashed var(--border, #e2e8f0); border-radius: 10px; padding: 12px 14px; background: linear-gradient(180deg, rgba(79,70,229,.04), transparent); }
+.pred-head { font-size: 13px; font-weight: 700; color: #4338ca; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.pred-head::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #4338ca; }
+.pred-src { font-size: 11px; font-weight: 400; color: var(--muted, #94a3b8); }
+.pred-block { margin-bottom: 10px; }
+.pred-block:last-child { margin-bottom: 0; }
+.pred-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pred-label { font-size: 11.5px; color: var(--muted, #64748b); margin-bottom: 6px; }
+.pred-x12 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.pred-ou { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pred-cell { display: block; background: var(--card, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: 8px; padding: 7px 9px; text-align: center; }
+.pred-cell em { display: block; font-style: normal; font-size: 11.5px; color: var(--muted, #64748b); margin-bottom: 2px; }
+.pred-cell b { font-size: 15px; color: #1e293b; }
+.pred-cell.is-pick { border-color: #4338ca; background: rgba(67,56,202,.08); }
+.pred-cell.is-pick b { color: #4338ca; }
+.pred-bar { display: block; height: 3px; border-radius: 2px; background: #eef2f7; margin-top: 5px; overflow: hidden; }
+.pred-bar i { display: block; height: 100%; background: #4338ca; border-radius: 2px; }
+.pred-pick { font-size: 12px; color: var(--muted, #64748b); margin-top: 6px; }
+.pred-pick b { color: #4338ca; }
+@media (max-width: 640px) { .pred-two { grid-template-columns: 1fr; } }
