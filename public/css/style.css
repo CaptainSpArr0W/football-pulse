@@ -811,3 +811,18 @@ img.crest, img.crest-big { object-fit: cover; }
   .recent-grid { grid-template-columns: 1fr; }
   .page-head h1 { font-size: 22px; }
 }
+
+/* ---------- 球员数据页 ---------- */
+.players-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.players-search { padding: 8px 14px; border: 1px solid var(--border, #e2e8f0); border-radius: 8px; font-size: 14px; background: var(--card, #fff); color: inherit; min-width: 200px; }
+.players-meta { font-size: 13px; color: var(--muted, #64748b); margin: 4px 0 10px; }
+.players-table-wrap { overflow-x: auto; border: 1px solid var(--border, #e2e8f0); border-radius: 10px; background: var(--card, #fff); }
+.players-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 980px; }
+.players-table thead th { position: sticky; top: 0; background: var(--head, #f1f5f9); color: var(--muted, #64748b); font-weight: 600; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border, #e2e8f0); white-space: nowrap; }
+.players-table tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border-soft, #f1f5f9); white-space: nowrap; }
+.players-table tbody tr:hover { background: var(--hover, #f8fafc); }
+.players-table .p-name { font-weight: 600; }
+.players-table .p-squad { color: var(--muted, #64748b); }
+.players-table .p-hot { font-weight: 700; color: #0f766e; }
+.score-badge { display: inline-block; min-width: 34px; text-align: center; padding: 3px 6px; border-radius: 6px; color: #fff; font-weight: 700; font-size: 12.5px; }
+.players-note { font-size: 12px; color: var(--muted, #94a3b8); margin-top: 10px; }

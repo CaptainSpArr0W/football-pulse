@@ -152,6 +152,28 @@ app.get('/api/standings', async (req, res) => {
   }
 });
 
+/* 英超球员数据（FBref 2025-26 赛季静态快照；?sort=score|gls|ast|mp|sh90|sot&pos=前锋&q=搜索&limit=N） */
+app.get('/api/players', (req, res) => {
+  try {
+    const data = require('./data/players-pl-2025.json');
+    const SORTS = { score: 'score', gls: 'gls', ast: 'ast', ga: 'ga', mp: 'mp', min: 'min', sh90: 'sh90', sot: 'sot' };
+    const sort = SORTS[req.query.sort] || 'score';
+    const pos = req.query.pos || '';
+    const q = String(req.query.q || '').toLowerCase();
+    const limit = Math.min(Number(req.query.limit) || 100, 600);
+    let list = data.players.slice();
+    if (pos) list = list.filter((p) => p.pos.includes(pos));
+    if (q) list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.squad || '').toLowerCase().includes(q));
+    list.sort((a, b) => b[sort] - a[sort]);
+    res.json({
+      season: data.season, league: data.league, source: data.source, updatedAt: data.updatedAt,
+      total: data.players.length, filtered: list.length, players: list.slice(0, limit),
+    });
+  } catch (err) {
+    res.status(500).json({ error: `球员数据获取失败：${err.message}` });
+  }
+});
+
 /* 手动刷新：立即同步最新赛程/比分/赔率（绕过赔率缓存；与定时同步互斥） */
 app.post('/api/refresh', async (req, res) => {
   const fetcher = require('./fetcher');

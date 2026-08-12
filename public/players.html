@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>球员数据 · 足球脉动</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="top-strip">
+      <div class="wrap top-strip-inner">
+        <span>已订阅人数：<b id="subCount">--</b></span>
+        <span>当前在线人数：<b id="onlineCount">--</b></span>
+      </div>
+    </div>
+    <div class="wrap header-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">
+          <strong>足球脉动</strong>
+          <em>FOOTBALL PULSE</em>
+        </span>
+      </a>
+      <nav class="top-nav" aria-label="主导航">
+        <a class="nav-link" href="/">实时赛程</a>
+        <a class="nav-link active" href="/players.html">球员数据</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <section class="page-head">
+      <h1 id="pageTitle">英超球员数据</h1>
+      <p class="page-sub" id="pageSub">加载中…</p>
+      <div class="filter-bar">
+        <div class="filters" id="posFilters" role="tablist">
+          <button class="filter-chip active" data-pos="">全部</button>
+          <button class="filter-chip" data-pos="门将">门将</button>
+          <button class="filter-chip" data-pos="后卫">后卫</button>
+          <button class="filter-chip" data-pos="中场">中场</button>
+          <button class="filter-chip" data-pos="前锋">前锋</button>
+        </div>
+        <div class="players-tools">
+          <select class="comp-select" id="sortSelect" aria-label="排序方式">
+            <option value="score">综合评分</option>
+            <option value="gls">进球</option>
+            <option value="ast">助攻</option>
+            <option value="ga">进球+助攻</option>
+            <option value="mp">出场</option>
+            <option value="min">出场时间</option>
+            <option value="sh90">每90分钟射门</option>
+            <option value="sot">射正</option>
+          </select>
+          <input class="players-search" id="searchInput" type="search" placeholder="搜索球员 / 球队…" aria-label="搜索球员">
+        </div>
+      </div>
+    </section>
+
+    <section class="players-section">
+      <div class="players-meta" id="playersMeta"></div>
+      <div class="players-table-wrap">
+        <table class="players-table" id="playersTable">
+          <thead>
+            <tr>
+              <th>评分</th><th>球员</th><th>国籍</th><th>位置</th><th>球队</th><th>年龄</th>
+              <th>出场</th><th>首发</th><th>时间</th><th>进球</th><th>助攻</th><th>G+A</th>
+              <th>射门</th><th>射正</th><th>射正率</th><th>每90射门</th>
+            </tr>
+          </thead>
+          <tbody id="playersBody"></tbody>
+        </table>
+        <p class="empty-state" id="playersEmpty" hidden>暂无匹配球员</p>
+      </div>
+      <p class="players-note" id="playersNote"></p>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <p>足球脉动 Football Pulse · 球员数据来源 FBref（2025-26 英超赛季快照）</p>
+    </div>
+  </footer>
+
+  <script src="/js/common.js"></script>
+  <script src="/js/players.js"></script>
+</body>
+</html>
