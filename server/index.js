@@ -69,6 +69,22 @@ app.get('/api/predictions', (req, res) => {
   }
 });
 
+/* 导出预测记录统计表（CSV）到本地桌面 */
+app.get('/api/predictions/export', (req, res) => {
+  try {
+    const predictor = require('./predictor');
+    const os = require('os');
+    const path = require('path');
+    const fs = require('fs');
+    const desktop = path.join(os.homedir(), 'Desktop');
+    const file = path.join(desktop, `足球预测记录_2026-27赛季_${new Date().toISOString().slice(0, 10)}.csv`);
+    fs.writeFileSync(file, predictor.exportCsv(), 'utf8');
+    res.json({ ok: true, file });
+  } catch (err) {
+    res.status(500).json({ error: `导出失败：${err.message}` });
+  }
+});
+
 /* 球队列表 */
 app.get('/api/teams', (req, res) => res.json({ teams: store.teams() }));
 
@@ -264,6 +280,16 @@ require('./cn-news').start(store);
 /* ---------- 真实数据同步（需 FOOTBALL_API_KEY 或 server/data/api-config.json） ---------- */
 const fetcher = require('./fetcher');
 fetcher.start(store);
+/* 赛后预测结算：每 2 分钟检查已结束比赛并回填命中（幂等） */
+setInterval(() => {
+  try {
+    const predictor = require('./predictor');
+    const finished = store.matches.filter((m) => m.status === 'finished' && m.score);
+    if (predictor.settleFinishedMatches(finished)) {
+      console.log('[predict] 已结算预测结果（比赛结束后自动回填命中）');
+    }
+  } catch (_) { /* 静默 */ }
+}, 2 * 60 * 1000);
 /* Understat xG 补充：同步完成后为已完赛比赛填充（每 6 小时重试） */
 setTimeout(() => {
   const n = require('./understat').applyAll(store);

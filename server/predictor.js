@@ -202,6 +202,26 @@ function predictMatch(competition, homeZh, awayZh) {
   };
 }
 
+/* ---------- 预测记录（全赛季日志，供赛后结算统计；不对外展示） ---------- */
+const LOG_FILE = path.join(__dirname, 'data', 'predictions-log.json');
+let logCache = null;
+function loadLog() {
+  if (logCache) return logCache;
+  try { logCache = JSON.parse(fs.readFileSync(LOG_FILE, 'utf8')); }
+  catch (_) { logCache = { season: '2026-27', records: [] }; }
+  return logCache;
+}
+function saveLog() {
+  try { fs.writeFileSync(LOG_FILE, JSON.stringify(logCache, null, 1), 'utf8'); }
+  catch (_) { /* 写失败不影响主流程 */ }
+}
+function logPrediction(entry) {
+  const log = loadLog();
+  if (log.records.some((r) => r.id === entry.id)) return; // 已记录
+  log.records.push(entry);
+  saveLog();
+}
+
 /* 缓存（1 小时） */
 let cache = { ts: 0, data: {} };
 const CACHE_MS = 3600 * 1000;
@@ -216,10 +236,89 @@ function predictionsForDate(dateStr, matches) {
     const hName = m._homeName || (m.home && m.home.name);
     const aName = m._awayName || (m.away && m.away.name);
     const pred = predictMatch(m.competition, hName, aName);
-    if (pred) out.push({ id: m.id, competition: m.competition, home: hName, away: aName, pred });
+    if (pred) {
+      out.push({ id: m.id, competition: m.competition, home: hName, away: aName, pred });
+      logPrediction({
+        id: String(m.id), date: dateStr, competition: m.competition,
+        home: hName, away: aName,
+        predX12: pred.x12Pick.label, predX12Prob: pred.x12Pick.prob,
+        expHome: pred.expGoals.home, expAway: pred.expGoals.away,
+        predOU: pred.ou.pick, overProb: pred.ou.over, underProb: pred.ou.under,
+        asianLine: pred.asian.lineText, predAsian: pred.asian.pick,
+        predAsianHome: pred.asian.homeCover, predAsianAway: pred.asian.awayCover,
+        actual: null, settled: false, hitX12: null, hitOU: null, hitAsian: null,
+      });
+    }
   }
   cache.data[dateStr] = out;
   return out;
 }
 
-module.exports = { predictMatch, predictionsForDate, zhToEn };
+/* 赛后结算：回填实际比分并判定三项命中（幂等，仅未结算记录） */
+function settleFinishedMatches(finishedMatches) {
+  const log = loadLog();
+  let changed = false;
+  for (const m of finishedMatches) {
+    const rec = log.records.find((r) => !r.settled && r.id === String(m.id));
+    if (!rec || !m.score) continue;
+    const h = Number(m.score.home), a = Number(m.score.away);
+    if (isNaN(h) || isNaN(a)) continue;
+    rec.actual = { home: h, away: a };
+    rec.settled = true;
+    /* 胜平负 */
+    const res = h > a ? '主胜' : h < a ? '客胜' : '平局';
+    rec.hitX12 = rec.predX12 === res;
+    /* 大小球 2.5 */
+    rec.hitOU = (h + a >= 3) ? rec.predOU === '大' : rec.predOU === '小';
+    /* 亚盘：主队让球（line 文本解析）后净胜判定，平手盘走盘不计命中 */
+    const lineMatch = /主让\s*([\d.]+)/.exec(rec.asianLine);
+    const lineHome = lineMatch ? -parseFloat(lineMatch[1]) : 0;
+    const lineAway = /主受\s*([\d.]+)/.test(rec.asianLine) ? parseFloat(/主受\s*([\d.]+)/.exec(rec.asianLine)[1]) : 0;
+    const line = lineHome + lineAway; // 主队让球视角：负=让
+    const net = h - a + line;
+    if (net > 0) rec.hitAsian = rec.predAsian === '主队' ? true : false;
+    else if (net < 0) rec.hitAsian = rec.predAsian === '客队' ? true : false;
+    else rec.hitAsian = null; // 走盘
+    changed = true;
+  }
+  if (changed) saveLog();
+  return changed;
+}
+
+/* 导出统计 CSV（UTF-8 BOM，Excel 兼容；含明细行 + 汇总行） */
+function exportCsv() {
+  const log = loadLog();
+  const recs = log.records;
+  const rows = [['日期', '联赛', '主队', '客队', '预测胜平负', '概率%', '预测大小球', '大球%', '小球%',
+    '亚盘', '预测赢盘方', '主队赢盘%', '实际比分', '实际结果', '胜平负命中', '大小球命中', '亚盘命中']];
+  for (const r of recs) {
+    rows.push([
+      r.date, r.competition, r.home, r.away,
+      r.predX12, r.predX12Prob, r.predOU, r.overProb, r.underProb,
+      r.asianLine, r.predAsian, r.predAsianHome,
+      r.actual ? `${r.actual.home}:${r.actual.away}` : '',
+      r.actual ? (r.actual.home > r.actual.away ? '主胜' : r.actual.home < r.actual.away ? '客胜' : '平局') : '',
+      r.hitX12 == null ? '' : (r.hitX12 ? '✓' : '✗'),
+      r.hitOU == null ? '' : (r.hitOU ? '✓' : '✗'),
+      r.hitAsian == null ? '' : (r.hitAsian ? '✓' : '✗'),
+    ]);
+  }
+  /* 汇总统计 */
+  const settled = recs.filter((r) => r.settled);
+  const rate = (list) => (list.length ? `${(list.filter(Boolean).length / list.length * 100).toFixed(1)}%` : '--');
+  const hitCount = (list) => list.filter(Boolean).length;
+  const rateTxt = (list) => `${hitCount(list)}/${list.length}（${rate(list)}）`;
+  rows.push([]);
+  rows.push(['=== 统计汇总 ===']);
+  rows.push(['已结算场次', settled.length, '', '', '未结算', recs.length - settled.length]);
+  rows.push(['胜平负命中率', rateTxt(settled.map((r) => r.hitX12))]);
+  rows.push(['大小球命中率', rateTxt(settled.map((r) => r.hitOU))]);
+  rows.push(['亚盘命中率', rateTxt(settled.map((r) => r.hitAsian))]);
+  rows.push(['生成时间', new Date().toLocaleString('zh-CN')]);
+  return '\uFEFF' + rows.map((r) => r.map((c) => {
+    const s = String(c == null ? '' : c);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(',')).join('\r\n');
+}
+
+module.exports = { predictMatch, predictionsForDate, settleFinishedMatches, exportCsv, zhToEn };

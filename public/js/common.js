@@ -120,6 +120,76 @@ function cornersTable(match) {
   <div class="odds-note">全场角球总数大小盘</div>`;
 }
 
+/* ---------- 比赛预测面板（Dixon-Coles 模型：胜平负 / 大小球 / 亚盘，置于选项卡内） ---------- */
+function predPanel(pred) {
+  if (!pred) return '';
+  const pct = (v) => (v == null ? '--' : `${v}%`);
+  const bar = (v) => `<span class="pred-bar"><i style="width:${Math.min(v, 100)}%"></i></span>`;
+  const x12 = pred.x12 || [];
+  const rows = x12.map((x) => `
+    <span class="pred-cell${x.label === pred.x12Pick.label ? ' is-pick' : ''}">
+      <em>${esc(x.label)}</em><b>${pct(x.prob)}</b>${bar(x.prob)}
+    </span>`).join('');
+  return `<div class="pred-wrap" data-pred>
+    <div class="pred-head">模型预测 <span class="pred-src">Dixon-Coles · 2025-26 数据拟合</span></div>
+    <div class="pred-block">
+      <div class="pred-label">胜平负</div>
+      <div class="pred-x12">${rows}</div>
+      <div class="pred-pick">推荐 <b>${esc(pred.x12Pick.label)}</b>（${pct(pred.x12Pick.prob)}）· 期望 ${pred.expGoals.home}:${pred.expGoals.away}</div>
+    </div>
+    <div class="pred-block pred-two">
+      <div>
+        <div class="pred-label">大小球（${pred.ou.line}）</div>
+        <div class="pred-ou">
+          <span class="pred-cell${pred.ou.pick === '大' ? ' is-pick' : ''}"><em>大球</em><b>${pct(pred.ou.over)}</b>${bar(pred.ou.over)}</span>
+          <span class="pred-cell${pred.ou.pick === '小' ? ' is-pick' : ''}"><em>小球</em><b>${pct(pred.ou.under)}</b>${bar(pred.ou.under)}</span>
+        </div>
+        <div class="pred-pick">推荐 <b>${esc(pred.ou.pick)}球</b>（${pct(pred.ou.pick === '大' ? pred.ou.over : pred.ou.under)}）</div>
+      </div>
+      <div>
+        <div class="pred-label">亚盘（${esc(pred.asian.lineText)}）</div>
+        <div class="pred-ou">
+          <span class="pred-cell${pred.asian.pick === '主队' ? ' is-pick' : ''}"><em>主队赢盘</em><b>${pct(pred.asian.homeCover)}</b>${bar(pred.asian.homeCover)}</span>
+          <span class="pred-cell${pred.asian.pick === '客队' ? ' is-pick' : ''}"><em>客队赢盘</em><b>${pct(pred.asian.awayCover)}</b>${bar(pred.asian.awayCover)}</span>
+        </div>
+        <div class="pred-pick">推荐 <b>${esc(pred.asian.pick)}</b>（${pct(pred.asian.pick === '主队' ? pred.asian.homeCover : pred.asian.awayCover)}）</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* 卡片选项卡组装：赔率 tabs（若有）+ 模型预测 tab（若有），均置于选项卡内 */
+function oddsSection(match) {
+  const od = match.odds || {};
+  const hasOdds = (od.europe && od.europe.length) || (od.asian && od.asian.length)
+    || (od.total && od.total.length) || (od.corners && od.corners.length);
+  const pred = match.pred;
+  if (!hasOdds && !pred) return '';
+
+  const tabs = [];
+  const panels = [];
+  if (hasOdds) {
+    tabs.push('<button class="odds-tab active" data-tab="europe">欧赔</button>',
+      '<button class="odds-tab" data-tab="asian">亚盘</button>',
+      '<button class="odds-tab" data-tab="total">大小球</button>',
+      '<button class="odds-tab" data-tab="corners">角球</button>');
+    panels.push(`<div class="odds-panel" data-panel="europe">${europeTable(match)}</div>`,
+      `<div class="odds-panel" data-panel="asian" hidden>${asianTable(match)}</div>`,
+      `<div class="odds-panel" data-panel="total" hidden>${totalTable(match)}</div>`,
+      `<div class="odds-panel" data-panel="corners" hidden>${cornersTable(match)}</div>`);
+  }
+  if (pred) {
+    tabs.push(`<button class="odds-tab${hasOdds ? '' : ' active'}" data-tab="pred">预测</button>`);
+    panels.push(`<div class="odds-panel" data-panel="pred"${hasOdds ? ' hidden' : ''}>${predPanel(pred)}</div>`);
+  }
+
+  return `<div class="odds-wrap" data-odds>
+    <div class="odds-tabs">${tabs.join('')}</div>
+    ${panels.join('')}
+    <div class="odds-updated">${match.status === 'live' ? '实时更新' : pred ? '模型预测 · Dixon-Coles' : '赛前数据'}</div>
+  </div>`;
+}
+
 function oddsTable(match) {
   const od = match.odds || {};
   const hasOdds = (od.europe && od.europe.length) || (od.asian && od.asian.length)
@@ -259,8 +329,7 @@ function matchCard(match, index) {
         ${crestHtml(match.away)}
       </div>
     </div>
-    ${oddsTable(match)}
-    ${predPanel(match.pred)}
+    ${oddsSection(match)}
   </div>`;
 }
 
