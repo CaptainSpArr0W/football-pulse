@@ -1,6 +1,6 @@
 /* 球员数据页：五大联赛 FBref + Understat 2025-26 赛季快照 */
 (function () {
-  const state = { league: 'ENG', pos: '', sort: 'score', q: '' };
+  const state = { league: 'ENG', sort: 'score', q: '' };
   const $ = (id) => document.getElementById(id);
   let debounceTimer = null;
 
@@ -17,7 +17,6 @@
 
   async function load() {
     const qs = new URLSearchParams({ league: state.league, sort: state.sort, limit: 300 });
-    if (state.pos) qs.set('pos', state.pos);
     if (state.q) qs.set('q', state.q);
     try {
       const res = await fetch(`/api/players?${qs}`);
@@ -73,14 +72,7 @@
     load();
   });
 
-  /* 位置切换 */
-  $('posFilters').addEventListener('click', (e) => {
-    const chip = e.target.closest('.filter-chip');
-    if (!chip) return;
-    document.querySelectorAll('#posFilters .filter-chip').forEach((c) => c.classList.toggle('active', c === chip));
-    state.pos = chip.dataset.pos;
-    load();
-  });
+  /* 位置切换已移除（用户要求只保留联赛筛选） */
 
   $('sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; load(); });
 
