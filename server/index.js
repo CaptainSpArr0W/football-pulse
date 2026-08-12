@@ -99,6 +99,17 @@ app.get('/api/team/:id', async (req, res) => {
     } catch (_) { team = null; }
   }
   if (!team) return res.status(404).json({ error: '球队不存在' });
+  // 阵容兜底：站点无实时首发时，用球队阵容数据填充（FBref 当前赛季优先 → 上赛季快照）
+  try {
+    if (!team.lineup || !team.lineup.length) {
+      const squads = require('./squads');
+      const got = squads.lineupFor(team);
+      if (got && got.lineup.length) {
+        team.lineup = got.lineup;
+        team.lineupSource = got.source;
+      }
+    }
+  } catch (_) { /* 阵容填充失败不影响详情页 */ }
   // 首发阵容球员名汉化（在线翻译，缓存 + 限额；MyMemory 配额恢复后自动生效）
   try {
     if (team.lineup) team.lineup = await require('./translate').translatePlayerNames(team.lineup);
@@ -276,6 +287,8 @@ require('./opportunity').start(store);
 
 /* ---------- 新闻聚合：ESPN（15 天内）+ 新浪体育 + 搜狐体育 → 各球队舆论新闻 ---------- */
 require('./cn-news').start(store);
+/* 球队阵容：FBref 当前赛季渐进抓取 + 上赛季快照兜底 */
+require('./squads').start();
 
 /* ---------- 真实数据同步（需 FOOTBALL_API_KEY 或 server/data/api-config.json） ---------- */
 const fetcher = require('./fetcher');

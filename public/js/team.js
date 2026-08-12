@@ -78,7 +78,7 @@
       $('#lineupList').innerHTML = '<li style="color:var(--ink-3);font-size:12.5px">暂无阵容数据，接入真实数据源后可查看</li>';
       return;
     }
-    $('#formationNote').textContent = `阵型 ${team.formation} · 首发 11 人（GK 门将）`;
+    $('#formationNote').textContent = `阵型 ${team.formation} · 阵容 ${team.lineup.length} 人${team.lineupSource ? ' · ' + team.lineupSource : ''}`;
     const svg = $('#pitchSvg');
     const color = team.color;
 

@@ -525,4 +525,4 @@ async function enrichMatch(match, force) {
   }
 }
 
-module.exports = { standingsAll, enrichMatch, fotmobMatchesByDate, fotmobMatchDetails, liveXg, fotmobTeam };
+module.exports = { standingsAll, enrichMatch, fotmobMatchesByDate, fotmobMatchDetails, liveXg, fotmobTeam, fbrefFetchHtml };
