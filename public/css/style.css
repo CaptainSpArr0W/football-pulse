@@ -816,10 +816,15 @@ img.crest, img.crest-big { object-fit: cover; }
 .players-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .players-search { padding: 8px 14px; border: 1px solid var(--border, #e2e8f0); border-radius: 8px; font-size: 14px; background: var(--card, #fff); color: inherit; min-width: 200px; }
 .players-meta { font-size: 13px; color: var(--muted, #64748b); margin: 4px 0 10px; }
-.players-table-wrap { overflow-x: auto; border: 1px solid var(--border, #e2e8f0); border-radius: 10px; background: var(--card, #fff); }
-.players-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 980px; }
-.players-table thead th { position: sticky; top: 0; background: var(--head, #f1f5f9); color: var(--muted, #64748b); font-weight: 600; text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border, #e2e8f0); white-space: nowrap; }
-.players-table tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border-soft, #f1f5f9); white-space: nowrap; }
+.players-table-wrap { overflow-x: auto; border: 1px solid var(--border, #e2e8f0); border-radius: 10px; background: var(--card, #fff); scrollbar-width: thin; scrollbar-color: #94a3b8 #f1f5f9; }
+.players-table-wrap::-webkit-scrollbar { height: 10px; }
+.players-table-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; border: 2px solid #fff; }
+.players-table-wrap::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.players-table-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 6px; }
+.players-scroll-hint { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; font-size: 12px; color: #64748b; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 6px 10px; }
+.players-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 1180px; }
+.players-table thead th { position: sticky; top: 0; background: var(--head, #f1f5f9); color: var(--muted, #64748b); font-weight: 600; text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border, #e2e8f0); white-space: nowrap; }
+.players-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #f1f5f9); white-space: nowrap; }
 .players-table tbody tr:hover { background: var(--hover, #f8fafc); }
 .players-table .p-name { font-weight: 600; }
 .players-table .p-squad { color: var(--muted, #64748b); }

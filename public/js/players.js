@@ -61,6 +61,13 @@
         <td>${fmt(p.sotPct, 1)}%</td>
         <td>${fmt(p.sh90, 2)}</td>
       </tr>`).join('');
+    /* 表格较宽时显示横向滚动提示，滚动到底部后淡出 */
+    const wrap = document.querySelector('.players-table-wrap');
+    const hint = $('scrollHint');
+    if (wrap && hint) {
+      hint.hidden = !(wrap.scrollWidth > wrap.clientWidth + 4);
+      wrap.onscroll = () => { if (wrap.scrollLeft > 8) hint.style.opacity = '0.3'; };
+    }
   }
 
   /* 联赛切换 */

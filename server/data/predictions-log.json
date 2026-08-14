@@ -24,7 +24,7 @@
    "hitOU": null,
    "hitAsian": null,
    "fused": false,
-   "updates": 18
+   "updates": 19
   },
   {
    "id": "f-564633",
@@ -49,7 +49,7 @@
    "hitOU": null,
    "hitAsian": null,
    "fused": false,
-   "updates": 18
+   "updates": 19
   },
   {
    "id": "f-564632",
@@ -74,7 +74,82 @@
    "hitOU": null,
    "hitAsian": null,
    "fused": false,
-   "updates": 18
+   "updates": 19
+  },
+  {
+   "id": "f-564638",
+   "date": "2026-08-21",
+   "competition": "西甲",
+   "home": "巴列卡诺",
+   "away": "阿拉维斯",
+   "predX12": "主胜",
+   "predX12Prob": 40.9,
+   "expHome": 1.35,
+   "expAway": 1.14,
+   "predOU": "小",
+   "overProb": 45.2,
+   "underProb": 54.8,
+   "asianLine": "平手",
+   "predAsian": "客队",
+   "predAsianHome": 40.9,
+   "predAsianAway": 59.1,
+   "fused": false,
+   "actual": null,
+   "settled": false,
+   "hitX12": null,
+   "hitOU": null,
+   "hitAsian": null,
+   "updates": 0
+  },
+  {
+   "id": "f-559715",
+   "date": "2026-08-22",
+   "competition": "法甲",
+   "home": "马赛",
+   "away": "斯特拉斯堡",
+   "predX12": "主胜",
+   "predX12Prob": 47.4,
+   "expHome": 1.88,
+   "expAway": 1.44,
+   "predOU": "大",
+   "overProb": 64.4,
+   "underProb": 35.6,
+   "asianLine": "平手",
+   "predAsian": "客队",
+   "predAsianHome": 47.4,
+   "predAsianAway": 52.6,
+   "fused": false,
+   "actual": null,
+   "settled": false,
+   "hitX12": null,
+   "hitOU": null,
+   "hitAsian": null,
+   "updates": 0
+  },
+  {
+   "id": "f-564647",
+   "date": "2026-08-22",
+   "competition": "西甲",
+   "home": "皇家贝蒂斯",
+   "away": "皇家社会",
+   "predX12": "主胜",
+   "predX12Prob": 43.6,
+   "expHome": 1.57,
+   "expAway": 1.28,
+   "predOU": "大",
+   "overProb": 54.1,
+   "underProb": 45.9,
+   "asianLine": "平手",
+   "predAsian": "客队",
+   "predAsianHome": 43.6,
+   "predAsianAway": 56.4,
+   "fused": false,
+   "actual": null,
+   "settled": false,
+   "hitX12": null,
+   "hitOU": null,
+   "hitAsian": null,
+   "updates": 0
   }
  ]
 }
