@@ -306,6 +306,7 @@ function predictionsForDate(dateStr, matches) {
     const aName = m._awayName || (m.away && m.away.name);
     const pred = predictMatch(m.competition, hName, aName, m.odds);
     if (pred) {
+      pred.oddsUpdatedAt = (m.odds && m.odds.updatedAt) || null;
       out.push({ id: m.id, competition: m.competition, home: hName, away: aName, pred });
       logPrediction({
         id: String(m.id), date: dateStr, competition: m.competition,

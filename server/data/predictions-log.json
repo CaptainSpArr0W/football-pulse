@@ -8,23 +8,23 @@
    "home": "阿拉维斯",
    "away": "赫塔菲",
    "predX12": "主胜",
-   "predX12Prob": 58.1,
+   "predX12Prob": 48.2,
    "expHome": 1.73,
    "expAway": 0.84,
    "predOU": "小",
-   "overProb": 47.4,
-   "underProb": 52.6,
-   "asianLine": "主让 0.5",
+   "overProb": 38,
+   "underProb": 62,
+   "asianLine": "主让 0.25",
    "predAsian": "主队",
-   "predAsianHome": 58.1,
-   "predAsianAway": 41.9,
+   "predAsianHome": 53.4,
+   "predAsianAway": 46.6,
    "actual": null,
    "settled": false,
    "hitX12": null,
    "hitOU": null,
    "hitAsian": null,
-   "fused": false,
-   "updates": 20
+   "fused": true,
+   "updates": 21
   },
   {
    "id": "f-564633",
@@ -49,7 +49,7 @@
    "hitOU": null,
    "hitAsian": null,
    "fused": false,
-   "updates": 20
+   "updates": 21
   },
   {
    "id": "f-564632",
@@ -74,7 +74,7 @@
    "hitOU": null,
    "hitAsian": null,
    "fused": false,
-   "updates": 20
+   "updates": 21
   },
   {
    "id": "f-564638",
@@ -99,7 +99,7 @@
    "hitX12": null,
    "hitOU": null,
    "hitAsian": null,
-   "updates": 1
+   "updates": 2
   },
   {
    "id": "f-559715",
@@ -124,7 +124,7 @@
    "hitX12": null,
    "hitOU": null,
    "hitAsian": null,
-   "updates": 1
+   "updates": 2
   },
   {
    "id": "f-564647",
@@ -149,7 +149,7 @@
    "hitX12": null,
    "hitOU": null,
    "hitAsian": null,
-   "updates": 1
+   "updates": 2
   }
  ]
 }

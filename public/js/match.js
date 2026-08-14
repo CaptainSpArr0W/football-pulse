@@ -283,7 +283,7 @@
         section.hidden = false;
         wrap.innerHTML = predPanel(found.pred);
         const note = wrap.querySelector('.pred-src');
-        if (note && found.pred.fused) note.textContent = '已融合 ODDS 网站最新赔率 · Dixon-Coles';
+        if (note && found.pred.fused) note.textContent = `已融合最新赔率（API-Football，更新 ${found.pred.oddsUpdatedAt ? new Date(found.pred.oddsUpdatedAt).toLocaleString('zh-CN') : '见盘口面板'}）· Dixon-Coles`;
       } else {
         section.hidden = true;
       }

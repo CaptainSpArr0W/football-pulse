@@ -128,7 +128,7 @@ function cornersTable(match) {
     <thead><tr><th></th><th>盘口</th><th>大角</th><th>小角</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <div class="odds-note">全场角球总数大小盘</div>`;
+  <div class="odds-note">全场角球总数大小盘${oddsUpdatedNote(match)}</div>`;
 }
 
 /* ---------- 比赛预测面板（Dixon-Coles 模型：胜平负 / 大小球 / 亚盘，置于选项卡内） ---------- */
