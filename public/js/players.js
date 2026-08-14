@@ -61,12 +61,26 @@
         <td>${fmt(p.sotPct, 1)}%</td>
         <td>${fmt(p.sh90, 2)}</td>
       </tr>`).join('');
-    /* 表格较宽时显示横向滚动提示，滚动到底部后淡出 */
+    /* 表格较宽时显示横向滚动提示 + 顶部同步滚动条 */
     const wrap = document.querySelector('.players-table-wrap');
     const hint = $('scrollHint');
+    const topBar = $('scrollTop');
     if (wrap && hint) {
-      hint.hidden = !(wrap.scrollWidth > wrap.clientWidth + 4);
-      wrap.onscroll = () => { if (wrap.scrollLeft > 8) hint.style.opacity = '0.3'; };
+      const wide = wrap.scrollWidth > wrap.clientWidth + 4;
+      hint.hidden = !wide;
+      if (topBar) {
+        topBar.hidden = !wide;
+        if (wide) {
+          topBar.firstElementChild.style.width = wrap.scrollWidth + 'px';
+          topBar.scrollLeft = wrap.scrollLeft;
+          /* 双向同步：顶部 ↔ 表格 */
+          topBar.onscroll = () => { wrap.scrollLeft = topBar.scrollLeft; };
+          wrap.onscroll = () => {
+            topBar.scrollLeft = wrap.scrollLeft;
+            if (wrap.scrollLeft > 8) hint.style.opacity = '0.3';
+          };
+        }
+      }
     }
   }
 

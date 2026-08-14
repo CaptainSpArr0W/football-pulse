@@ -821,6 +821,13 @@ img.crest, img.crest-big { object-fit: cover; }
 .players-table-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; border: 2px solid #fff; }
 .players-table-wrap::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 .players-table-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 6px; }
+/* 顶部同步横向滚动条 */
+.players-scroll-top { overflow-x: scroll; overflow-y: hidden; height: 14px; border: 1px solid var(--border, #e2e8f0); border-bottom: none; border-radius: 10px 10px 0 0; background: var(--card, #fff); scrollbar-width: thin; scrollbar-color: #94a3b8 #f1f5f9; }
+.players-scroll-top::-webkit-scrollbar { height: 10px; }
+.players-scroll-top::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; border: 2px solid #fff; }
+.players-scroll-top::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.players-scroll-top::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 6px; }
+.players-scroll-top .players-scroll-track { height: 1px; }
 .players-scroll-hint { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; font-size: 12px; color: #64748b; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 6px 10px; }
 .players-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 1180px; }
 .players-table thead th { position: sticky; top: 0; background: var(--head, #f1f5f9); color: var(--muted, #64748b); font-weight: 600; text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border, #e2e8f0); white-space: nowrap; }
