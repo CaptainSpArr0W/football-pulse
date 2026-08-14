@@ -24,7 +24,7 @@
    "hitOU": null,
    "hitAsian": null,
    "fused": false,
-   "updates": 19
+   "updates": 20
   },
   {
    "id": "f-564633",
@@ -49,7 +49,7 @@
    "hitOU": null,
    "hitAsian": null,
    "fused": false,
-   "updates": 19
+   "updates": 20
   },
   {
    "id": "f-564632",
@@ -74,7 +74,7 @@
    "hitOU": null,
    "hitAsian": null,
    "fused": false,
-   "updates": 19
+   "updates": 20
   },
   {
    "id": "f-564638",
@@ -99,7 +99,7 @@
    "hitX12": null,
    "hitOU": null,
    "hitAsian": null,
-   "updates": 0
+   "updates": 1
   },
   {
    "id": "f-559715",
@@ -124,7 +124,7 @@
    "hitX12": null,
    "hitOU": null,
    "hitAsian": null,
-   "updates": 0
+   "updates": 1
   },
   {
    "id": "f-564647",
@@ -149,7 +149,7 @@
    "hitX12": null,
    "hitOU": null,
    "hitAsian": null,
-   "updates": 0
+   "updates": 1
   }
  ]
 }

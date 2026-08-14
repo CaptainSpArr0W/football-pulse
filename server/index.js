@@ -18,11 +18,20 @@ app.use(express.json());
 
 /* ---------- REST API ---------- */
 
+/* 列表用比赛视图：不携带赔率/事件详情（赔率仅在比赛详情页展示） */
+const listMatch = (m) => {
+  const pm = store._publicMatch(m);
+  delete pm.odds;
+  delete pm.events;
+  delete pm.h2h;
+  return pm;
+};
+
 /* 总览：可用日期、赛事分类、每日赛程（competitions 始终列出全部配置联赛） */
 app.get('/api/overview', (req, res) => {
   const dates = store.availableDates();
   const byDate = {};
-  for (const d of dates) byDate[d] = store.matchesByDate(d).map((m) => store._publicMatch(m));
+  for (const d of dates) byDate[d] = store.matchesByDate(d).map((m) => listMatch(m));
   const { ALL_LEAGUES } = require('./data/competitions');
   res.json({
     today: store.today,
@@ -36,7 +45,7 @@ app.get('/api/overview', (req, res) => {
 app.get('/api/matches', (req, res) => {
   const { date } = req.query;
   const list = date ? store.matchesByDate(date) : store.matches;
-  res.json({ date: date || null, matches: list.map((m) => store._publicMatch(m)) });
+  res.json({ date: date || null, matches: list.map((m) => listMatch(m)) });
 });
 
 /* 五大联赛比赛预测（Dixon-Coles 模型，2025-26 数据拟合；?date=YYYY-MM-DD 默认全部未开赛） */

@@ -154,7 +154,6 @@
         </div>
       </div>
       ${section('实力分区', '基于上赛季联赛排名（ESPN）', powerHtml('home', data.power.home), powerHtml('away', data.power.away))}
-      ${predHtml(m.id)}
       ${section('xG', '本场预期进球（Fotmob）', xgHtml(m, 'home'), xgHtml(m, 'away'))}
       ${section('近六场综合', '两队在各自联赛近六场进/失球合计', formHtml(data.form.home), formHtml(data.form.away))}
       ${section('首发阵容', lineupNote, lineupHtml(m.homeTeam, data.lineups.home), lineupHtml(m.awayTeam, data.lineups.away))}
