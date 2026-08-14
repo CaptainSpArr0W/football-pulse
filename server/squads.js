@@ -203,8 +203,8 @@ function buildFromFormation(starters, formation) {
   let d = byPos.后卫.slice(0, rule.df);
   let f = byPos.前锋.slice(0, rule.fw);
   let midsAll = byPos.中场.slice(0, rule.mids.reduce((a, b) => a + b, 0));
-  /* 位置不足时补足：后卫/中场/前锋互相补充至 10 人 */
-  let need = 10 - gk.length - d.length - midsAll.length - f.length;
+  /* 位置不足时补足：后卫/中场/前锋互相补充至 11 人（门将 1 + 其余 10） */
+  let need = 11 - gk.length - d.length - midsAll.length - f.length;
   const restPool = byPos.后卫.slice(d.length).concat(byPos.中场.slice(midsAll.length), byPos.前锋.slice(f.length));
   while (need > 0 && restPool.length) {
     const pick = restPool.shift();
@@ -314,13 +314,17 @@ function lineupFor(team) {
     return null;
   };
   const cur = loadCurrent();
+  /* 匹配键：精确 → 包含 → 去除数字后的包含（Bayer 04 Leverkusen ↔ Bayer Leverkusen） */
   const matchKey = (() => {
     for (const k of keys) {
       if (cur.teams[k]) return k;
+      const kNoNum = k.replace(/[0-9]+/g, '');
       for (const ik of Object.keys(cur.teams)) {
         if (ik.includes(k) || k.includes(ik)) {
           if (Math.abs(ik.length - k.length) <= 12) return ik;
         }
+        const ikNoNum = ik.replace(/[0-9]+/g, '');
+        if (kNoNum.length > 2 && (ikNoNum.includes(kNoNum) || kNoNum.includes(ikNoNum))) return ik;
       }
     }
     return null;
