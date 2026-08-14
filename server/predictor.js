@@ -298,9 +298,9 @@ function logPrediction(entry) {
   saveLog();
 }
 
-/* 缓存（1 小时；赔率更新后调用 invalidateCache 强制重算） */
+/* 缓存（30 分钟；赔率更新后调用 invalidateCache 强制重算；空结果不缓存避免首查早于同步） */
 let cache = { ts: 0, data: {} };
-const CACHE_MS = 3600 * 1000;
+const CACHE_MS = 30 * 60 * 1000;
 function invalidateCache() { cache = { ts: 0, data: {} }; }
 
 function predictionsForDate(dateStr, matches) {
@@ -329,7 +329,7 @@ function predictionsForDate(dateStr, matches) {
       });
     }
   }
-  cache.data[dateStr] = out;
+  if (out.length) cache.data[dateStr] = out; // 空结果不缓存（避免同步前首查污染缓存）
   return out;
 }
 
