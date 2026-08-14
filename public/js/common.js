@@ -45,6 +45,17 @@ function emptyRow(bookmaker) {
   </tr>`;
 }
 
+/* 盘口数据更新时间标注（API-Football 快照，北京时间） */
+function oddsUpdatedNote(match) {
+  const u = match && match.odds && match.odds.updatedAt;
+  if (!u) return '';
+  const t = new Date(u);
+  const bj = new Date(t.getTime() + 8 * 3600 * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  const s = `${bj.getUTCFullYear()}-${p(bj.getUTCMonth() + 1)}-${p(bj.getUTCDate())} ${p(bj.getUTCHours())}:${p(bj.getUTCMinutes())}`;
+  return ` · 数据更新 ${s}（免费源快照，可能滞后于实时盘口）`;
+}
+
 function europeTable(match) {
   const rows = match.odds.europe
     .map((o) => {
@@ -60,7 +71,7 @@ function europeTable(match) {
     <thead><tr><th></th><th>主胜</th><th>平局</th><th>客胜</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <div class="odds-note">胜平负赔率 · 数据来源 API-Football</div>`;
+  <div class="odds-note">胜平负赔率 · 数据来源 API-Football${oddsUpdatedNote(match)}</div>`;
 }
 
 function asianTable(match) {
@@ -79,7 +90,7 @@ function asianTable(match) {
     <thead><tr><th></th><th>盘口</th><th>主水</th><th>客水</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <div class="odds-note">盘口以主队视角，负数为让球，正数为受让</div>`;
+  <div class="odds-note">盘口以主队视角，负数为让球，正数为受让${oddsUpdatedNote(match)}</div>`;
 }
 
 function totalTable(match) {
@@ -98,7 +109,7 @@ function totalTable(match) {
     <thead><tr><th></th><th>盘口</th><th>大球</th><th>小球</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <div class="odds-note">总进球数盘口</div>`;
+  <div class="odds-note">总进球数盘口（免费源为欧式整球盘 1.5/2.5，非亚洲大小球盘）${oddsUpdatedNote(match)}</div>`;
 }
 
 function cornersTable(match) {

@@ -399,6 +399,16 @@ function pickLineBet(bet, targetLine, bookmakerName) {
   return { bookmaker: zhBook(bookmakerName), ...best, open: true };
 }
 
+/* 主流亚洲庄家优先级（亚盘/大小球/欧赔列表按此排序，预测与主盘展示优先参考） */
+const BOOK_PRIORITY = ['SBO', 'SBOBET', '平博', 'Pinnacle', '必发', 'Betfair', 'bet365', '10Bet', '1xBet', 'Bwin', '威廉希尔', 'William Hill', 'Marathonbet', 'Unibet', 'BetVictor'];
+function sortByPriority(arr) {
+  return arr.sort((a, b) => {
+    const ia = BOOK_PRIORITY.indexOf(a.bookmaker);
+    const ib = BOOK_PRIORITY.indexOf(b.bookmaker);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+}
+
 /* 某场比赛赔率 → 站点格式（无则返回 null）；force=true 时绕过缓存（手动刷新用） */
 async function oddsFor(fixtureId, status, force) {
   const ttl = force ? 0 : (status === 'live' ? 5 * 60 * 1000 : 30 * 60 * 1000);
@@ -412,8 +422,14 @@ async function oddsFor(fixtureId, status, force) {
     const t = mapTotal(bm); if (t) odds.total.push(t);
     const c = mapCorners(bm); if (c) odds.corners.push(c);
   }
+  /* 主流庄家优先（预测与展示主盘参考 SBO/平博/bet365 等），并记录数据更新时间 */
+  sortByPriority(odds.europe);
+  sortByPriority(odds.asian);
+  sortByPriority(odds.total);
+  sortByPriority(odds.corners);
   // 控制展示数量
   for (const k of Object.keys(odds)) odds[k] = odds[k].slice(0, 10);
+  odds.updatedAt = f.update || null;
   return odds;
 }
 
