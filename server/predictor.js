@@ -133,38 +133,46 @@ function asianLine(diff) {
 /* ---------- 赔率融合：把 ODDS 网站最新赔率（隐含概率去水）与模型概率按 5:5 融合 ---------- */
 const MARKET_WEIGHT = 0.5;
 
-/* 欧赔 → [主胜, 平, 客胜] 隐含概率（去水归一化） */
+/* 欧赔 → [主胜, 平, 客胜] 隐含概率（去水归一化；优先 SBO 主流亚洲庄家） */
 function europeImplied(odds) {
-  const e = odds && odds.europe && odds.europe.find((o) => o.open !== false);
+  const list = odds && odds.europe;
+  if (!list || !list.length) return null;
+  const e = list.find((o) => o.bookmaker === 'SBO') || list.find((o) => o.open !== false);
   if (!e || !(e.home > 1) || !(e.draw > 1) || !(e.away > 1)) return null;
   const raw = [1 / e.home, 1 / e.draw, 1 / e.away];
   const s = raw[0] + raw[1] + raw[2];
   return s > 0 ? raw.map((v) => v / s) : null;
 }
-/* 大小球盘口 → over 隐含概率（取最接近 line 的盘口） */
+/* 大小球盘口 → over 隐含概率（优先 SBO 主盘，无 SBO 时取最接近 line 的盘口） */
 function totalImplied(odds, line) {
   const arr = odds && odds.total;
   if (!arr || !arr.length) return null;
-  let best = null, bd = Infinity;
-  for (const o of arr) {
-    if (o.line == null) continue;
-    const d = Math.abs(o.line - line);
-    if (d < bd) { bd = d; best = o; }
+  let best = arr.find((o) => o.bookmaker === 'SBO') || null;
+  if (!best) {
+    let bd = Infinity;
+    for (const o of arr) {
+      if (o.line == null) continue;
+      const d = Math.abs(o.line - line);
+      if (d < bd) { bd = d; best = o; }
+    }
   }
   if (!best || !(best.over > 1) || !(best.under > 1)) return null;
   const po = 1 / best.over, pu = 1 / best.under;
   const s = po + pu;
   return s > 0 ? { pOver: po / s, marketLine: best.line } : null;
 }
-/* 亚盘 → 主队赢盘隐含概率（取最接近模型让球线的盘口） */
+/* 亚盘 → 主队赢盘隐含概率（优先 SBO 主盘，无 SBO 时取最接近模型让球线的盘口） */
 function asianImplied(odds, line) {
   const arr = odds && odds.asian;
   if (!arr || !arr.length) return null;
-  let best = null, bd = Infinity;
-  for (const o of arr) {
-    if (o.line == null) continue;
-    const d = Math.abs(o.line - line);
-    if (d < bd) { bd = d; best = o; }
+  let best = arr.find((o) => o.bookmaker === 'SBO') || null;
+  if (!best) {
+    let bd = Infinity;
+    for (const o of arr) {
+      if (o.line == null) continue;
+      const d = Math.abs(o.line - line);
+      if (d < bd) { bd = d; best = o; }
+    }
   }
   if (!best || !(best.home > 1) || !(best.away > 1)) return null;
   const ph = 1 / best.home, pa = 1 / best.away;
